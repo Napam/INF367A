@@ -1,0 +1,185 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[left=2.5cm, right=2.5cm, top=2.0cm]{geometry}
+\usepackage{sectsty}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{undertilde}
+\usepackage{kbordermatrix}
+\usepackage{listings}
+\usepackage{ulem}
+\usepackage{soul}
+% \usepackage{tikz}
+% \usepackage{pgfplots}
+% \pgfplotsset{compat=1.16} 
+\usepackage{siunitx}
+\usepackage{pythonhighlight}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{url}
+\usepackage{enumitem}
+\usepackage{bm}
+\usepackage{empheq}
+\usepackage{tcolorbox}
+\usepackage{framed}
+\usepackage{xparse}
+\usepackage{algorithm, algorithmic}
+% \usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{mathtools}
+% \usepackage[shortlabels]{enumitem}
+
+\input{custom_commands.tex}
+
+% \renewcommand*{\arraystretch}{1.5}
+
+\newlength{\rowidth}% row operation width
+\AtBeginDocument{\setlength{\rowidth}{3em}}
+
+\floatname{algorithm}{Algorithm}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+
+\begin{document}
+\title{\textbf{INF367A Exercise 6}}
+\author{Naphat Amundsen}
+\maketitle
+\sectionfont{\fontsize{14}{15}\selectfont}
+\subsectionfont{\fontsize{12}{15}\selectfont}
+\subsubsectionfont{\fontsize{12}{15}\selectfont}
+\graphicspath{ {./images/} }
+
+\ifx
+\begin{figure}[H]
+	\centering
+	\includegraphics[scale=0.8]{Figure_2}
+	\caption{Insert caption here}
+\end{figure}
+\fi
+
+
+
+\section*{Introduction}
+This exercise is about deriving and using regression using Bayesian methods (i.e include the prior).
+
+\section{Posterior of regression weights}
+\begin{tcolorbox}
+    Suppose $y_i = w^T x_i + \epsilon_i$ for  $i = 1, \ldots, n$ where $\epsilon_i \sim \mathcal{N}(0, \beta^{-1})$. Assume a prior 
+
+    $$w \sim \mathcal{N}(0, \alpha^{-1}I).$$
+    
+    Use 'completing the square' to show that the posterior of $w$ is given by $P(w|y,x,\alpha,\beta)=\mathcal{N}(w|m,S)$, where 
+    \begin{align*}
+        S &= \left( \alpha I + \beta \sumlim{1}{n} x_i x_i^T \right)^{-1} \\ 
+        m &= \beta S \sumlim{1}{n} y_i x_i
+    \end{align*}    
+\end{tcolorbox}
+\newcommand{\mvnexpol}[2]{\exp \left[  -{\frac{1}{2}} #1^T #2 #1 \right]}
+
+\textbf{1)} Want to get posterior (or something proportional to it) in quadratic form:
+\begin{align}
+    \frac{1}{2} \theta^T A \theta + b^T \theta
+\end{align}
+\begin{align}
+    P(w|y, x, \alpha, \beta) &\propto \overtext{P(w) P(y, x, \alpha, \beta|w)}{Notation will be abused} \\
+    &= N(w|0,\alpha I) \prodlim{1}{n} \mathcal{N}(\overtext{y_i - w^T x_i}{$\mathcal{N}(-x|0, \Sigma) = \mathcal{N}(x|0, \Sigma)$} |0, \beta^{-1}) \\
+    &\propto \mvnexpol{w}{\alpha I} \prodlim{1}{n} \mvnexpol{(y_i - w^T x_i)}{\beta}
+\end{align}
+
+Logarithm the thing to make math doable
+\begin{align}
+    \Rightarrow \ln P(w|y, x, \alpha, \beta) &= \ln \left( \mvnexpol{w}{\alpha I} \prodlim{1}{n} \mvnexpol{(y_i - w^T x_i)}{\beta} \right) \\ 
+    &= -\frac{1}{2} w^T \alpha I w -\frac{1}{2} \sumlim{1}{n} (y_i - w^T x_i)^T \beta (y_i - w^T x_i) \\ 
+    &= -\frac{1}{2} \left[ w^T \alpha I w + \sumlim{1}{n} (y_i - w^T x_i)^T \beta (y_i - w^T x_i) \right] 
+\end{align}
+Let $w^T x_i = p$ (don't want to use $\hat{y_i}$ since it confuses me when there are a lot of $y_i$ symbols as well)
+\begin{align}
+    &= -\frac{1}{2} \left[ w^T \alpha I w + \sumlim{1}{n} (y_i - p_i)^T \beta (y_i - p_i) \right] \\
+    &= -\frac{1}{2} \left[ w^T \alpha I w + \sumlim{1}{n} y_i^T \beta y_i - y_i^T \beta p_i - p_i^T \beta y_i + p_i^T \beta p_i \right] \\
+    &\propto -\frac{1}{2} \left[ w^T \alpha I w + \sumlim{1}{n} - y_i^T \beta p_i - p_i^T \beta y_i + p_i^T \beta p_i \right] \\
+    &= -\frac{1}{2} \Big[ w^T \alpha I w + \sumlim{1}{n} \overtext{- y_i^T \beta p_i - y_i^T \beta p_i + p_i^T \beta p_i}{$\beta$ is symmetric $\Rightarrow p_i^T \beta y_i = y_i^T \beta p_i$} \Big] \\
+    &= -\frac{1}{2} \Big[ w^T \alpha I w + \sumlim{1}{n} - 2 y_i^T \beta p_i + p_i^T \beta p_i \Big] \\
+    &= -\frac{1}{2} \Big[ w^T \alpha I w + \sumlim{1}{n} \overtext{- 2 y_i^T \beta w^Tx_i + x_i^Tw \beta w^Tx_i}{Just realized that $\beta$ and $y_i$ are in fact just scalars lol} \Big] \\
+    &= -\frac{1}{2} \enclb{w^T \alpha I w + \sumlim{1}{n} - 2 y_i^T \beta w^Tx_i + \beta w^T x_i x_i^T w} \\
+    &= -\frac{1}{2} \enclb{w^T \alpha I w - 2 \sumlim{1}{n} y_i^T \beta x_i^Tw + \sumlim{1}{n} \beta w^T x_i x_i^T w} \\
+    &= -\frac{1}{2} \enclb{w^T \enclp{\alpha I + \beta \sumlim{1}{n} x_ix_i^T} w - 2 \enclp{\beta \sumlim{1}{n} y_i^T x_i^T} w} \\ 
+    &= -\frac{1}{2} w^T \enclp{\alpha I + \beta \sumlim{1}{n} x_ix_i^T} w + \enclp{\beta \sumlim{1}{n} y_i^T x_i^T} w
+\end{align}
+Now it is in quadratic form yo, let 
+\begin{align}
+    A = \enclp{\alpha I + \beta \sumlim{1}{n} x_i x_i^T}, \quad b = \enclp{\beta \sumlim{1}{n} y_i x_i} 
+\end{align}
+Then by completing the square, we obtain the parameters $S$ (variance), $m$ (mean) for a Gaussian (see lecture slides).
+\begin{align}
+S &= A^{-1} = \enclp{\alpha I + \beta \sumlim{1}{n} x_i x_i^T}^{-1} \\
+m &= A^{-1} b = \beta S \sumlim{1}{n} y_i x_i \\ 
+&\dunderline{\Rightarrow P(w|y,x,\alpha,\beta) = \mathcal{N}(w|m,S)}
+\end{align}
+
+\section{Poisson regression with Laplace approximation}
+\begin{tcolorbox}
+    Poisson regression can be used to model count data. That is, the label $y_i$ tells how many times some event occurs ($y_i$ is a non-negative integer). In this exercise, we try to predict the number of cyclists crossing Brooklyn Bridge given that we know precipitation in New York. A Poisson regression model can be defined as
+    \begin{align*}
+        y_i | &\theta \sim \operatorname{Poisson}(\exp(\theta^Tx_i)) \\ 
+        &\theta \sim \mathcal{N}(0,\alpha^{-1} I)
+    \end{align*}
+    where $y_i$ are the observed counts, $x_i$ the related covariates, $i = 1,\ldots,N,$ and $\theta$ are the regression weights. In this exercise, we approximate the posterior $P(\theta|y)$ using the Laplace approximation.
+    \begin{enumerate}
+        \item Derive the gradient $\nabla \log P(\theta|y)$ and the Hessian $H = \nabla \nabla \log P(\theta|y)$ needed for the Laplace approximation. Note that the posterior may look overly complicated but things get easier once you take the logarithm.
+        \item Load data new\_york\_bicycles.csv. The data points are daily observations from year 2017. The data set has two variables. The first variable $(x)$ is the daily precipitation in New York. The second variable $(y)$ is the number of cyclists crossing the Brooklyn Bridge (measured in hundreds of cyclists).
+        \item Split the data into training and test sets.
+        \item Approximate the posterior distribution for parameters $\theta$ given the training data using Laplace approximation. To get reasonable results, you need to use two-dimensional $\theta$, that is, you should include an intercept term.
+        \item Plot the true posterior and the approximation. Plot the difference between the true and approximate posterior in a third figure. Is the approximation reasonable? Hint: Generate a grid for the parameter values (for example, using numpy’s meshgrid). Compute unnormalized density on each grid point. Normalize by dividing the unnormalized densities by the sum over the whole grid. (This is not an exact normalization but it is close enough for our purposes.)
+        \item Estimate credible intervals for the predicted number of cyclists (Note: the interval depends on $x$). Plot test data with precipitation on x-axis and the number of cyclists on y-axis. Plot the mean of the predictive distribution as a function of $x$. Plot the 50\% credible intervals.
+        \item Is your model well-calibrated? Does about 50\% of test points lie within 50\% credible interval (and similarly for 90\% interval)?
+    \end{enumerate}
+\end{tcolorbox}
+\textbf{2.1)} Poisson distribution is:
+\begin{align}
+    P(K = k|\lambda) = \frac{\lambda^k e^{-k}}{k!}
+\end{align}
+Assuming data points are i.i.d 
+\allowdisplaybreaks
+\begin{align}
+    \ln P(\theta|y) &\propto \ln P(\theta)P(y|\theta) \\
+    &= -\frac{1}{2} \theta^T \alpha I \theta + \sumlim{1}{n} \ln \frac{\lambda^\theta e^{-\lambda}}{\theta!} \\ 
+    &= -\frac{1}{2} \theta^T \alpha I \theta + \sumlim{1}{n} \ln \frac{\exp(\theta^T x_i y_i) e^{-\exp(\theta^T x_i)}}{y_i!} \\ 
+    &\propto -\frac{1}{2} \theta^T \alpha I \theta + \sumlim{1}{n} \ln \exp(\theta^T x_i y_i) e^{-\exp(\theta^T x_i)} \\ 
+    &= -\frac{1}{2} \theta^T \alpha I \theta + \sumlim{1}{n} \theta^T x_i y_i - \sumlim{1}{n} \exp(\theta^T x_i) 
+\end{align}
+This is not a nice form (i.e no nice conjugate prior), so we have to approximate posterior using Laplace approximation (Taylor series expansion to quadratic term, assuming density function of posterior is normal). We must first and second derivative of what we have so far:
+\begin{align}
+    \nabla \ln P(\theta|y) &\propto \pfrac{}{\theta} \enclb{-\frac{1}{2} \theta^T \alpha I \theta + \sumlim{1}{n} \theta^T x_i y_i - \sumlim{1}{n} \exp(\theta^T x_i)}\\ 
+    % &\dunderline{= - \alpha I \theta + \sumlim{1}{n} x_i y_i - \exp\enclp{\sumlim{1}{n}\theta^Tx_i} \sumlim{1}{n}x_i} \\
+    &\dunderline{= - \alpha I \theta + \sumlim{1}{n} x_i y_i - \sumlim{1}{n} x_i \exp(\theta^Tx_i)} \\
+    H = \nabla\nabla\ln P(\theta|y) &= \pfrac[2]{}{\theta} \ln P(\theta|y) \\ 
+    &\propto \pfrac{}{\theta} \enclb{- \alpha I \theta + \sumlim{1}{n} x_i y_i - \sumlim{1}{n} x_i \exp(\theta^Tx_i)} \\
+    &\dunderline{= - \alpha I - \sumlim{1}{n} x_ix_i^T \exp(\theta^Tx_i)}
+\end{align}
+
+\textbf{2.2, 2.3, 2.4)} Shuffle and then take first $150$ as train, rest as test. Laplace approximation (optimizing using Newton's method) gives ($\theta_0 = \bs 0$):
+\begin{align}
+    \theta = 
+    \begin{pmatrix}
+        -0.933 \\
+        3.375
+    \end{pmatrix}
+\end{align}
+where last element is intercept term. Testing with different initial values for $\theta_0$ converges to same result.
+
+\vspace{5mm}
+\textbf{2.5} Get that Hessian inverse at $\theta$ from previous task is not positive semidefinite (it has negative values in diagonal). :(
+
+\appendix
+\section{Task 2 code}
+\inputpython{task2.py}{0}{1000}
+
+% \bibliographystyle{apalike}
+% \bibliographystyle{ieeetran}
+% \bibliography{citations}
+
+\end{document}
+

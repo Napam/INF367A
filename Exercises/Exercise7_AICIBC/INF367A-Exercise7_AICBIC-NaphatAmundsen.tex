@@ -1,0 +1,205 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[left=2.5cm, right=2.5cm, top=2.0cm]{geometry}
+\usepackage{sectsty}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{undertilde}
+\usepackage{kbordermatrix}
+\usepackage{listings}
+\usepackage{ulem}
+\usepackage{soul}
+% \usepackage{tikz}
+% \usepackage{pgfplots}
+% \pgfplotsset{compat=1.16} 
+\usepackage{siunitx}
+\usepackage{pythonhighlight}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{url}
+\usepackage{enumitem}
+\usepackage{bm}
+\usepackage{empheq}
+\usepackage{tcolorbox}
+\usepackage{framed}
+\usepackage{xparse}
+\usepackage{algorithm, algorithmic}
+% \usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{mathtools}
+% \usepackage[shortlabels]{enumitem}
+\tcbuselibrary{breakable}
+
+\input{custom_commands.tex}
+
+% \renewcommand*{\arraystretch}{1.5}
+
+\newlength{\rowidth}% row operation width
+\AtBeginDocument{\setlength{\rowidth}{3em}}
+
+\floatname{algorithm}{Algorithm}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+
+\begin{document}
+\title{\textbf{INF367A Exercise 7}}
+\author{Naphat Amundsen}
+\maketitle
+\sectionfont{\fontsize{14}{15}\selectfont}
+\subsectionfont{\fontsize{12}{15}\selectfont}
+\subsubsectionfont{\fontsize{12}{15}\selectfont}
+\graphicspath{ {./images/} }
+
+\ifx
+\begin{figure}[H]
+	\centering
+	\includegraphics[scale=0.8]{Figure_2}
+	\caption{Insert caption here}
+\end{figure}
+\fi
+
+\section*{Introduction}
+This exercise is about doing Bayesian model selection. 
+
+\section{Task}
+\begin{tcolorbox}[breakable]
+    We want to use linear models. But the data are not always linear and thus we may need to use basis functions to     handle non-linearity. However, it is not clear which basis functions are good for any particular data.  Furthermore, selection of the noise precision $\beta$ is crucial for to get good performance. 
+
+    \vspace{5mm}
+    In this task, we model (again) bicycling in New York. You should download the data set new\_york\_bicycles3.csv from MittUiB. The goal is to predict the highest daily temperature given the other variables. In this exercise, we select a set of basis functions and the value of $\beta$. To this end, you should try different basis functions and different values of $\beta$. In other words, a model is specified by the basis functions and beta,   i.e., $M_i = (\phi_i ,\beta_i ).$ Note: If the selected $\beta$ is either smallest or the largest value that you  tried, then you should probably try more values. Use the following model selection strategies: 
+
+    \begin{enumerate}
+        \item Use the posterior ratio to select a model. To do this, you need to compute marginal likelihoods.  (Note: you want to compare $P(D | M_i )P(M_i)$ values of different models.) 
+        \item Use BIC to select a model. (Note: you want to maximize BIC.) 
+        \item Use AIC to select a model. (Note: you want to minimize AIC.) 
+        \item Use cross-validation to select a model. (Note: you want to minimize the validation loss.) 
+    \end{enumerate}
+
+    \textbf{Hints:} Typically, one projects data to higher dimensions. However, it may be useful to consider projecting data also to a lower dimensional space (i.e. not to use all features). 
+
+    \vspace{3mm}
+    Remember that when you compute marginal likelihood, you should use the predictive distribution $P(y | \hat{f_\theta}(x)) = N(y | m^T \phi(x),1/\beta + \phi(x)^T S\phi(x)).$ In case of AIC, BIC, and the cross-validation loss, you should use the the usual likelihood $P(y|w,x,\beta) = N(y|w^T \phi(x),1/\beta).$ 
+
+    \vspace{3mm}
+    Remember that the MAP estimate of a Gaussian distribution is its mean. 
+
+    \vspace{3mm}
+    Scipy's Gaussian distribution, norm has a scale parameter that takes in a standard deviation, i.e., p $\sqrt{1/precision}$. 
+
+    \vspace{3mm}
+    If you get totally insensible results, first sanity check is to check whether you are minimizing when you should be maximizing or vice versa.
+\end{tcolorbox}
+\section*{Methods:}
+    Disclaimer: I am just writing what I think here in case I forget in the future, scroll down to find actual answers.
+    \subsection*{Posterior ratio and BIC}
+    Posterior ratio in this context is simply comparing the posteriors to all the models, i.e
+    $P(D|M_i)P(M_i) / P(D)$, but is since $P(D)$ is a common factor for all, we can ignore it, thus needing only to compare $P(D|M_i)P(M_i)$. The models have parameters $\theta$ (in this case coefficients of the basis functions and the intercept), so we have to marginalize away $\theta$ in order to obtain $P(D|M_i)$: 
+    \begin{align}
+        P(D|M_i) = \int P(D|\theta, M_i)P(\theta|M_i)d\theta
+    \end{align}
+    when $n \rightarrow \infty$.
+
+    \noindent The integral is not in a nice form, so it is approximated using Laplace approximation, which results in:
+    \begin{align}
+        \log P(D|M_i) \approx \sumlim{1}{n} \log P(D_i|\theta,M_i) + \log P(\theta|M_i) + \frac{d}{2}\log 2\pi - \frac{d}{2} \log n - \frac{1}{2} |F(\hat{\theta})| 
+    \end{align}
+    Then for large values of $n$ (which we already assume), several terms converge to constants, resulting with 
+    \begin{align}
+        \log P(D|\hat{\theta}, M) - \frac{d}{2}\log n \label{eq:bic}
+    \end{align}
+    where $\hat{\theta} = \arg\max_\theta P(D|\theta,M)P(\theta|M).$ 
+
+    \noindent All of which we will define as $BIC(M) = \log P(D|\hat{\theta},M) - \frac{d}{2} \log n$
+
+    \noindent In order to find $\hat{\theta}$ we can simply use the conjugate prior linear regression weights assuming that the prior weights are normally distributed as $\theta \sim \mathcal{N}(0,\alpha^{-1} I)$:
+    \begin{align}
+        S &= A^{-1} = \enclp{\alpha I + \beta \sumlim{1}{n} x_i x_i^T}^{-1} \\
+        m &= A^{-1} b = \beta S \sumlim{1}{n} y_i x_i \\ 
+        &\Rightarrow P(w|y,x,\alpha,\beta) = \mathcal{N}(w|m,S)
+    \end{align}
+    where $\beta$ is the error precision ($\epsilon_i \sim \mathcal{N}(0, \beta^{-1})$). Since the normal distribution peaks at its mean, $\hat{\theta}$ is simply the mean $m$. 
+
+    \subsection*{AIC}
+    Pure instrumentally, AIC is very similar to BIC (although the fundamental ideas are different). AIC is defined as 
+    \begin{align}
+        AIC = -\frac{2}{n} \log  P(y|\hat{\theta},X) + 2 \cdot \frac{d}{n}
+    \end{align}
+    Note that likelihood here is using a different notation than BIC. 
+
+    \subsection*{Cross Validation}
+    Just regular cross validation. The cross validation performed in this task is with 5 folds. The hyperparameter in interest is the degree of the polynomial basis function. 
+
+\section{Actual answers}
+I assume that $P(M_i) \sim \operatorname{Uniform}$. In the case of posterior ratio, the assumption effectively removes the prior ratio as they will always be $1$:
+    \begin{align}
+        &\frac{P(M_i|D)}{P(M_j|D)} = \frac{P(D|M_i)}{P(D|M_j)} \times \frac{P(M_i)}{P(M_j)} \\
+        \Rightarrow &\frac{P(M_i|D)}{P(M_j|D)} = \frac{P(D|M_i)}{P(D|M_j)}
+    \end{align}
+Effectively, we are comparing which posteriors have the highest values, so I will just do that instead of finding the ratios between all combinations of things. Why make it difficult you know?
+
+\def\b#1\textbf{#1}
+The candidate models are polynomial models of degree 1 to 8. The results are as follows:
+\begin{table}[H]
+    \centering
+    \caption{Model selection for polynomial fit. AIC and BIC uses $\hat{\theta}$ that was calculated the Bayesian way (conjugate prior). The Cross Validation calculates $\hat{\theta}$ using whatever Sklearn uses. The performance metric for CV is the negative mean absolute error (same error as AIC and BIC, but negative). Posterior: higher is better, BIC: higher is better, AIC: lower is better, CV higher is better. Best values with respect to method is bolded. \textbf{Note:} Since we assumed uniform prior for models, comparing posterior ratios is equivalent to comparing BIC values}
+    \begin{tabular}{llrrrrr}
+        \toprule
+             &   &  LogLhoods &      BIC &   AIC &      CV\_val &  CV\_train \\
+        beta & degree &            &          &       &             &           \\
+        \midrule
+        0.10 & 1 &   -1482.97 & -1499.07 & 13.92 &       -8.40 &     -6.89 \\
+             & 2 &   -1143.85 & -1200.19 & 10.89 &       -8.75 &     -6.13 \\
+             & 3 &    -967.78 & -1118.03 &  9.57 &      -16.13 &     -5.00 \\
+             & 4 &    \b{-743.22}  & -1081.27 &  8.12 &     -148.72 &     -6.28 \\
+             & 5 &   -5844.83 & -6520.95 & 56.98 &    -5583.39 &     -3.47 \\
+             & 6 &   -5837.21 & -7076.75 & 58.87 &   -26028.28 &     -0.23 \\
+             & 7 &   -5913.04 & -8037.97 & 62.66 &  -161911.32 &     -0.02 \\
+             & 8 &   -5913.04 & -9366.04 & 67.29 & -1182049.76 &     -0.06 \\
+        1.58 & 1 &   -3944.54 & -3960.63 & 36.92 &       -8.40 &     -6.89 \\
+             & 2 &   -3893.18 & -3949.52 & 36.58 &       -8.75 &     -6.13 \\
+             & 3 &   -3613.14 & -3763.39 & 34.29 &      -16.13 &     -5.00 \\
+             & 4 &   -2405.22 & -2743.27 & 23.66 &     -148.72 &     -6.28 \\
+             & 5 &   -5833.08 & -6509.19 & 56.87 &    -5583.39 &     -3.47 \\
+             & 6 &   -5913.04 & -7152.58 & 59.58 &   -26028.28 &     -0.23 \\
+             & 7 &   -5913.04 & -8037.97 & 62.66 &  -161911.32 &     -0.02 \\
+             & 8 &   -5913.04 & -9366.04 & 67.29 & -1182049.76 &     -0.06 \\
+        3.05 & 1 &   -4426.03 & -4442.13 & 41.42 &       -8.40 &     -6.89 \\
+             & 2 &   -4399.65 & -4455.99 & 41.31 &       -8.75 &     -6.13 \\
+             & 3 &   -4125.45 & -4275.70 & 39.08 &      -16.13 &     -5.00 \\
+             & 4 &   -2901.54 & -3239.60 & 28.29 &     -148.72 &     -6.28 \\
+             & 5 &   -5887.47 & -6563.59 & 57.38 &    -5583.39 &     -3.47 \\
+             & 6 &   -5913.04 & -7152.58 & 59.58 &   -26028.28 &     -0.23 \\
+             & 7 &   -5913.04 & -8037.97 & 62.66 &  -161911.32 &     -0.02 \\
+             & 8 &   -5913.04 & -9366.04 & 67.29 & -1182049.76 &     -0.06 \\
+        4.53 & 1 &   -4678.90 & -4694.99 & 43.78 &       -8.40 &     -6.89 \\
+             & 2 &   -4657.49 & -4713.83 & 43.72 &       -8.75 &     -6.13 \\
+             & 3 &   -4372.17 & -4522.42 & 41.38 &      -16.13 &     -5.00 \\
+             & 4 &   -3207.27 & -3545.32 & 31.15 &     -148.72 &     -6.28 \\
+             & 5 &   -5831.43 & -6507.54 & 56.85 &    -5583.39 &     -3.47 \\
+             & 6 &   -5913.04 & -7152.58 & 59.58 &   -26028.28 &     -0.23 \\
+             & 7 &   -5913.04 & -8037.97 & 62.66 &  -161911.32 &     -0.02 \\
+             & 8 &   -5913.04 & -9366.04 & 67.29 & -1182049.76 &     -0.06 \\
+        6.00 & 1 &   -4830.13 & -4846.23 & 45.20 &       -8.40 &     -6.89 \\
+             & 2 &   -4837.83 & -4894.17 & 45.41 &       -8.75 &     -6.13 \\
+             & 3 &   -4534.53 & -4684.78 & 42.90 &      -16.13 &     -5.00 \\
+             & 4 &   -3407.26 & -3745.32 & 33.02 &     -148.72 &     -6.28 \\
+             & 5 &   -5858.63 & -6534.75 & 57.11 &    -5583.39 &     -3.47 \\
+             & 6 &   -5913.04 & -7152.58 & 59.58 &   -26028.28 &     -0.23 \\
+             & 7 &   -5913.04 & -8037.97 & 62.66 &  -161911.32 &     -0.02 \\
+             & 8 &   -5913.04 & -9366.04 & 67.29 & -1182049.76 &     -0.06 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+Posterior, BIC, AIC seem to agree that a polynomial kernel of degree 4 is the best. Cross validation says that we should have degree 1, and for some weird reason the mean training error is best at 7 degrees and not 8. 
+% \bibliographystyle{apalike}
+% \bibliographystyle{ieeetran}
+% \bibliography{citations}
+\appendix
+\section*{Code}
+\inputpython{models.py}{0}{1000}
+
+\end{document}
+

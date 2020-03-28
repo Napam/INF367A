@@ -1,0 +1,130 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[left=2.5cm, right=2.5cm, top=2.0cm]{geometry}
+\usepackage{sectsty}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{undertilde}
+\usepackage{kbordermatrix}
+\usepackage{listings}
+\usepackage{ulem}
+\usepackage{soul}
+% \usepackage{tikz}
+% \usepackage{pgfplots}
+% \pgfplotsset{compat=1.16} 
+\usepackage{siunitx}
+\usepackage{pythonhighlight}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{url}
+\usepackage{enumitem}
+\usepackage{bm}
+\usepackage{empheq}
+\usepackage{tcolorbox}
+\usepackage{framed}
+\usepackage{xparse}
+\usepackage{algorithm, algorithmic}
+% \usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{tabularx}
+% ref packages
+\usepackage{nameref}
+% folowing  must be in this order
+\usepackage{varioref}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{mathtools}
+\DeclareMathOperator*{\argmax}{arg\,max}
+% \usepackage[shortlabels]{enumitem}
+\tcbuselibrary{breakable}
+\allowdisplaybreaks
+
+\input{custom_commands.tex}
+
+% \renewcommand*{\arraystretch}{1.5}
+
+\newlength{\rowidth}% row operation width
+\AtBeginDocument{\setlength{\rowidth}{3em}}
+
+\floatname{algorithm}{Algorithm}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+
+\begin{document}
+\title{\textbf{INF367A Exercise 10}}
+\author{Naphat Amundsen}
+\maketitle
+\sectionfont{\fontsize{14}{15}\selectfont}
+\subsectionfont{\fontsize{12}{15}\selectfont}
+\subsubsectionfont{\fontsize{12}{15}\selectfont}
+\graphicspath{ {./images/} }
+
+\ifx
+\begin{figure}[H]
+	\centering
+	\includegraphics[scale=0.8]{Figure_2}
+	\caption{Insert caption here}
+\end{figure}
+\fi
+\ifx
+\begin{figure}[H]
+	\centering
+	\includegraphics[scale=0.8]{bn_network.png}
+	\caption{Plate diagram of the regression model with ARD prior. Variables $x_i$ , and $y_i$ are observed; We are interested in the posterior distribution of parameters $w$, $\alpha$ and $\beta$. The constants $a_0$ , $b_0$, $c_0$ , and $d_0$ are user-defined hyperparameters}
+\end{figure}
+\fi
+
+\newcommand{\opGamma}{\operatorname{Gamma}}
+
+\section{Introduction}
+    This exercise is about using Gibbs sampling to estimate the posterior even with missing data. 
+
+\section{Gibbs sampler}
+    \subsection{Deriving conjugate prior for \texorpdfstring{$\mu$}{}}
+        We assume here that we have the missing values, so we simply need to derive the conjugate prior 
+        of the likelihood of the "assumed complete data". 
+        \begin{align*}
+            \log P(\mu|x,z) &= \sumlim{1}{n} \enclb{-\frac{1}{2}(x_i-\mu)^T \Sigma^{-1} (x_i-\mu)} \\ 
+            &=-\frac{1}{2}\sumlim{1}{n} (x_i-\mu)^T \Sigma^{-1} (x_i-\mu) \\
+            &=-\frac{1}{2}\sumlim{1}{n} x_i^T\Sigma^{-1}x_i - x_i^T\Sigma^{-1}\mu - \mu^T\Sigma^{-1}x_i +   \mu^T\Sigma^{-1}\mu\\
+            &\propto -\frac{1}{2}\sumlim{1}{n} - 2x_i^T\Sigma^{-1}\mu + \mu^T\Sigma^{-1}\mu\\
+            &= \sumlim{1}{n} x_i^T\Sigma^{-1}\mu - \frac{1}{2}\mu^T\Sigma^{-1}\mu\\
+            &=  N\bar{X}^T\Sigma^{-1}\mu - \frac{1}{2}\mu^TN\Sigma^{-1}\mu\\
+            &=  - \frac{1}{2}\mu^T\undertext{\Sigma^{-1}}{$=A$}\mu + \undertext{\bar{X}^T\Sigma^{-1}}{$=b^T$}\mu 
+        \end{align*}
+        Completing the square:
+        \begin{align*}
+            S &= A^{-1} = \Sigma \\ 
+            m &= Sb = \Sigma \Sigma^{-1} \bar{X} = \bar{X}\\
+            &\dunderline{\Rightarrow \mu \sim \mathcal{N}(\bar{X},\Sigma)} \\ 
+            \text{For future self: }&\text{think before deriving something obvious!!!}
+        \end{align*}
+    
+    \subsection{Deriving conjugate prior for \texorpdfstring{$Z$}{}}
+        Conveniently, marginalizing away features from multivariate gaussians is simply done by dropping said features from the multivariate function \cite{marginalmvn}. In this case we will remain with a univariate Gaussian. Let $\sigma^2 = \Sigma_{11}$
+        \begin{align*}
+            P(Z|X,\mu) &= \prodlim[j]{1}{k} N(z_{j1}|\mu_1, \sigma)\\
+            &\Rightarrow \dunderline{P(z_{j1}|\mu_1,\mu) = N(\mu_1,\Sigma_{11})}
+        \end{align*}
+    
+    \subsection{Implementation}
+    The implementation of the Gibbs sampler is then very simple. 
+    \begin{enumerate}
+        \item Initialize values for $Z$ and $\mu$
+        \item For iterations $t$ in $T$ do:
+        \begin{enumerate}[label*={\arabic*.}]
+            \item Sample $\mu_t \sim \mathcal{N}(\bar{X}, \Sigma)$ ($X$ here is data with sampled $Z$ for missing data) 
+            \item Sample $Z_t$ by sampling for each $z_{i1} \sim N(\mu_1, \Sigma_{11})$
+        \end{enumerate}
+    \end{enumerate}
+
+
+\appendix
+
+% \bibliographystyle{apalike}
+\bibliographystyle{ieeetran}
+\bibliography{citations}
+    
+\end{document}
+    

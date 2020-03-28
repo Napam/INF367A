@@ -1,0 +1,91 @@
+
+%  ---------------------- COMMANDS ---------------------------
+% Double underline
+\def\dunderline#1{\underline{\underline{#1}}}
+
+% Shorten nonumber command
+\def\nnb{\nonumber}
+
+% Shorten boldsymbol command
+\def\bs#1{\boldsymbol{#1}}
+
+% Algorithmic newline
+\def\algonewline{\STATE{ }}
+
+% Eigenvectors of
+\def\eigvecof{\text{eigenvectors of }}
+
+% Eigenvalues of 
+\def\eigvalof{\text{eigenvalues of }}
+
+% Enclose in square brackets
+\newcommand{\enclb}[1]{\left[#1\right]}
+% Enclose in parenthesis
+\newcommand{\enclp}[1]{\left(#1\right)}
+
+% Annotate first argument, text in second argument
+\newcommand{\overtext}[2]{\overbrace{#1}^{\mathclap{\text{#2}}}}
+\newcommand{\undertext}[2]{\underbrace{#1}_{\mathclap{\text{#2}}}}
+
+% Normalization constant in multivariate normal
+\newcommand{\mvnconst}[1]{\frac{1}{(2\pi)^{d/2} |#1|^{1/2}}}
+
+% Exponential factor in multivariate normal
+\newcommand{\mvnexpo}[3][x]{\exp \left[  -{\frac{1}{2}} (#1 - #2)^T #3^{-1} (#1 - #2) \right]}
+
+% Multivariate normal
+\newcommand{\mvn}[3][x]{\mvnconst{#3} \mvnexpo[#1]{#2}{#3}}
+
+% For numbering in align* environment
+\newcommand{\numberthis}{\addtocounter{equation}{1}\tag{\theequation}}
+
+%  Sum notation w/ limits as argument and index as option
+\newcommand{\sumlim}[3][i]{\sum\limits_{#1=#2}^{#3}}
+
+%  Product notation w/ limits as argument and index as option
+\newcommand{\prodlim}[3][i]{\prod\limits_{#1=#2}^{#3}}
+
+%  Sum notation with only information beneath
+\newcommand{\sumnolim}[1]{\sum\limits_{#1}}
+
+%  Integral notation w/ limits as argument and index as option
+\newcommand{\intlim}[2]{\int\limits_{#1}^{#2}}
+
+%  Integral over whole domain notation, no args
+\newcommand{\intinf}{\int\limits_{-\infty}^{\infty}}
+
+%  Partial derivative notation, arg1: numerator, arg2: denominator
+\newcommand{\pfrac}[3][ ]{\frac{\partial^{#1} #2}{\partial #3^{#1}}}
+
+%  Derivative notation, arg1: numerator, arg2: denominator
+\newcommand{\dvfrac}[3][ ]{\frac{\text{d}^{#1} #2}{\text{d} #3^{#1}}}
+
+% When doing Gauss-Jordan, create arrow showing operations
+\newcommand{\ro}[1]{\xrightarrow{\mathmakebox[\rowidth]{#1}}}
+
+% ----------------------INVIRONMENTS---------------------------
+% Item list with title
+\newenvironment{titlemize}[1]{%
+  \paragraph{#1}
+  \begin{itemize}}
+  {\end{itemize}}
+
+  % Enum list with title
+\newenvironment{titleenum}[1]{%
+  \paragraph{#1}
+  \begin{enumerate}}
+  {\end{enumerate}}
+
+  % Augmented matrix (matrix with vertical line)
+\newenvironment{sysmatrix}[1]
+  {\left(\begin{array}{@{}#1@{}}}
+  {\end{array}\right)}
+
+ % Make matrices with more spacing
+\makeatletter
+\renewcommand*\env@matrix[1][\arraystretch]{%
+  \edef\arraystretch{#1}%
+  \hskip -\arraycolsep
+  \let\@ifnextchar\new@ifnextchar
+  \array{*\c@MaxMatrixCols c}}
+\makeatother
