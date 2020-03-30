@@ -5,7 +5,9 @@ from sklearn.preprocessing import PolynomialFeatures
 from scipy.stats import gamma, norm
 from scipy.stats import multivariate_normal as mvn
 from typing import Callable, Union
+from collections import defaultdict
 np.random.seed(42069)
+from tqdm import tqdm
 
 _eps = 1e-32
 
@@ -14,7 +16,7 @@ class LinearRegression:
     Linear regression using Gibbs Sampling without ARD
     '''
     def __init__(self, init_ws: np.ndarray=None, init_beta: float=None,
-                 polydegree: int=1, alpha: float=1, a: float=1, b: float=1,
+                 polydegree: int=1, alpha: float=1, a: float=0.01, b: float=0.01,
                  n_gibbs: int=42069):
         '''
         polydegree: degree of polynomial kernel
@@ -51,10 +53,10 @@ class LinearRegression:
 
         i: iteration index
         '''
-        # self.D_cov is 1/self.alpha * I
+        # self.D_cov is self.alpha * I
         S = np.linalg.inv(self.D_cov + self.betas[i]*self.X.T@self.X)
         m = self.betas[i]*S@(self.X*self.y.reshape(-1,1)).sum(axis=0)
-        return mvn.rvs(mean=m,cov=S)
+        return mvn.rvs(mean=m, cov=S)
 
     def _sample_beta(self, i: int) -> float:
         '''
@@ -64,9 +66,7 @@ class LinearRegression:
         i: iteration index
         '''
         p = self.y - self.ws[i]@self.X.T
-        # return gamma.rvs(self.a+self.n/2, 1/(self.b+0.5*p.T@p))
-        # return gamma.rvs(a=self.a+self.n/2, scale=1/(self.b+0.5*p.T@p))
-        return gamma.rvs(a=self.a+self.n/2, scale=self.b+0.5*p.T@p)
+        return gamma.rvs(a=self.a+self.n/2, scale=1/(self.b+0.5*p.T@p))
 
     def _logposterior(self, i: int):
         '''
@@ -78,27 +78,15 @@ class LinearRegression:
 
         # self.D_cov is 1/self.alpha * I
         log_w =\
-        mvn.logpdf(self.ws[i], origo, self.D_cov).clip(_eps).sum()
+        mvn.logpdf(self.ws[i], mean=origo, cov=self.D_cov).clip(_eps).sum()
 
         log_beta =\
-        gamma.logpdf(self.betas[i], a=self.a, scale=self.b).clip(_eps).sum()
-        # gamma.logpdf(self.betas[i], a=self.a, scale=1/self.b).clip(_eps).sum()
+        gamma.logpdf(self.betas[i], a=self.a, scale=1/self.b).clip(_eps).sum()
 
         log_data =\
-        norm.logpdf(self.y, self.ws[i]@self.X.T, np.sqrt(1/self.betas[i]))\
-            .clip(_eps).sum()
-        # origo = np.zeros(self.dim)
-
-        # # self.D_cov is 1/self.alpha * I
-        # log_w =\
-        # np.log(mvn.pdf(self.ws[i], origo, self.D_cov).clip(_eps)).sum()
-
-        # log_beta =\
-        # np.log(gamma.pdf(self.betas[i], self.a, 1/self.b).clip(_eps)).sum()
-
-        # log_data =\
-        # np.log(norm.pdf(self.y, self.ws[i]@self.X.T, np.sqrt(1/self.betas[i]))\
-        #     .clip(_eps)).sum()
+        norm.logpdf(self.y, loc=self.ws[i]@self.X.T, 
+                    scale=np.sqrt(1/self.betas[i])).clip(_eps).sum()
+            
         return log_w + log_beta + log_data
 
     def _init_fit(self, X, y):
@@ -124,7 +112,6 @@ class LinearRegression:
         # Initalize memory for w, beta, alpha
         self.ws = np.empty((self.n_gibbs, self.dim))     # vectors
         self.betas = np.empty(self.n_gibbs)              # scalars
-        self.alphas = np.empty((self.n_gibbs, self.dim)) # vectors
         self.logposteriors = np.empty(self.n_gibbs)      # scalars
 
         # Initial model parameters
@@ -134,8 +121,7 @@ class LinearRegression:
             self.init_beta = np.random.uniform(0.1, 2, 1)
 
         # To be used in self._sample_w
-        self.D_cov = np.eye(self.dim)
-        np.fill_diagonal(self.D_cov, 1/self.alpha)
+        self.D_cov = np.eye(self.dim)*self.alpha
 
         self.ws[0] = self.init_ws
         self.betas[0] = self.init_beta
@@ -160,14 +146,20 @@ class LinearRegression:
         return self
 
     def _determine_w(self):
+        '''
+        Determines w_hat by taking argmax of histogram
+        '''
         self.w_hat = np.empty(self.dim)
         for i, w in enumerate(self.ws.T):
-            hist, edges = np.histogram(w[512:], bins='scott')
+            hist, edges = np.histogram(w[self.n_gibbs//4:], bins='scott')
             self.w_hat[i]=edges[hist.argmax()+1]
         return self.w_hat
 
     def _determine_beta(self):
-        hist, edges = np.histogram(self.betas, bins='scott')
+        '''
+        Determines beta_hat by taking argmax of histogram
+        '''
+        hist, edges = np.histogram(self.betas[self.n_gibbs//4:], bins='scott')
         self.beta_hat = edges[hist.argmax()+1]
         return self.beta_hat
 
@@ -204,7 +196,7 @@ class LinearRegression:
 
         self.plot_kwargs = {'linewidth':0.69}
         # Histogram bin count calculated using Scott's rule
-        self.hist_kwargs = {'bins':'scott', 'edgecolor':'k', 'linewidth':0.69}
+        self.hist_kwargs = {'bins':'auto', 'edgecolor':'k', 'linewidth':0.69}
 
     def plot_result(self, figsize:tuple = (9,9), axes: list=[0,1],
                     skip: int=10, show: bool=True) -> None:
@@ -221,28 +213,14 @@ class LinearRegression:
                                  self.plot_dict.keys(),
                                  self.plot_dict.values()):
             self.axes_traces[i].set_title(title+' trace')
-            self.axes_traces[i].plot(data[512:], **self.plot_kwargs)
+
+            self.axes_traces[i].plot(data[self.n_gibbs//4:], **self.plot_kwargs)
 
             self.axes_hists[i].set_title(title+' hist')
-            self.axes_hists[i].hist(data[512:], **self.hist_kwargs)
+            self.axes_hists[i].hist(data[self.n_gibbs//4:], **self.hist_kwargs)
 
         self.fig.tight_layout()
         if show: plt.show()
-
-    def get_bic(self):
-        '''Returns bic value'''
-        penalty = (self.dim*2+1)/2*np.log(self.n)
-        lhood = norm.logpdf(self.y, self.w_hat@self.X.T, self.beta_hat).sum()
-        # lhood = np.log(norm.pdf(self.y, self.w_hat@self.X.T, self.beta_hat)\
-        #     .clip(_eps)).sum()
-        return lhood-penalty
-
-    def get_aic(self):
-        penalty = 2*(self.dim*2+1)/self.n
-        lhood = norm.logpdf(self.y, self.w_hat@self.X.T, self.beta_hat).sum()
-        # lhood = np.log(norm.pdf(self.y, self.w_hat@self.X.T, self.beta_hat)\
-            # .clip(_eps)).sum()
-        return -2*lhood/self.n+penalty
 
 class LinearRegressionARD(LinearRegression):
     '''
@@ -250,8 +228,8 @@ class LinearRegressionARD(LinearRegression):
     Fitted using Gibbs sampling.
     '''
     def __init__(self, init_ws: np.ndarray=None, init_beta: float=None,
-                 init_alphas:np.ndarray=None, polydegree: int=1, a: float=1,
-                 b: float=1, c: float=5, d: float=0.01, n_gibbs: int=42069):
+                 init_alphas:np.ndarray=None, polydegree: int=1, a: float=0.01,
+                 b: float=0.01, c: float=0.01, d: float=0.01, n_gibbs: int=42069):
         '''
         polydegree: degree of polynomial kernel
 
@@ -305,14 +283,11 @@ class LinearRegressionARD(LinearRegression):
         i: iteration index
         '''
         # gamma.rvs will return a vector
-        # alphas = gamma.rvs(self.c_, 1/((self.ws[i]**2)*0.5+self.d), 
-        #                    size=self.dim)
-        alphas = gamma.rvs(a=self.c_, scale=(self.ws[i]**2)*0.5+self.d,
+        alphas = gamma.rvs(a=self.c_, scale=1/((self.ws[i]**2)*0.5+self.d),
                           size=self.dim)
-        # alphas = gamma.rvs(a=self.c_, scale=1/((self.ws[i]**2)*0.5+self.d),
-        #                   size=self.dim)
         # Update covariance 
-        np.fill_diagonal(self.D, 1/alphas)
+        # np.fill_diagonal(self.D, 1/alphas)
+        np.fill_diagonal(self.D, alphas)
         return alphas
 
     def _logposterior(self, i: int):
@@ -322,33 +297,18 @@ class LinearRegressionARD(LinearRegression):
         i: iteration index
         '''
         log_w =\
-        norm.logpdf(self.ws[i], 0, np.sqrt(1/self.alphas[i]))\
+        norm.logpdf(self.ws[i], loc=0, scale=np.sqrt(1/self.alphas[i]))\
             .clip(_eps).sum()
 
         log_alphas =\
-        gamma.logpdf(self.alphas[i], a=self.c, scale=self.d).clip(_eps).sum()
-        # gamma.logpdf(self.alphas[i], a=self.c, scale=1/self.d).clip(_eps).sum()
+        gamma.logpdf(self.alphas[i], a=self.c, scale=1/self.d).clip(_eps).sum()
 
         log_betas =\
-        gamma.logpdf(self.betas[i], a=self.a, scale=self.b).clip(_eps).sum()
-        # gamma.logpdf(self.betas[i], a=self.a, scale=1/self.b).clip(_eps).sum()
+        gamma.logpdf(self.betas[i], a=self.a, scale=1/self.b).clip(_eps).sum()
 
         log_data =\
-        norm.logpdf(self.y, self.ws[i]@self.X.T, np.sqrt(1/self.betas[i]))\
-            .clip(_eps).sum()
-        # log_w =\
-        # np.log(norm.pdf(self.ws[i], 0, np.sqrt(1/self.alphas[i]))\
-        #     .clip(_eps)).sum()
-
-        # log_alphas =\
-        # np.log(gamma.pdf(self.alphas[i], self.c, 1/self.d).clip(_eps)).sum()
-
-        # log_betas =\
-        # np.log(gamma.pdf(self.betas[i], self.a, 1/self.b).clip(_eps)).sum()
-
-        # log_data =\
-        # np.log(norm.pdf(self.y, self.ws[i]@self.X.T, np.sqrt(1/self.betas[i]))\
-        #     .clip(_eps)).sum()
+        norm.logpdf(self.y, loc=self.ws[i]@self.X.T, 
+                    scale=np.sqrt(1/self.betas[i])).clip(_eps).sum()
         return log_w + log_alphas + log_betas + log_data
 
     def _init_fit(self, X, y):
@@ -392,7 +352,7 @@ class LinearRegressionARD(LinearRegression):
         # To be used in self._sample_w() and will be updated in place
         # in self._sample_alpha()
         self.D = np.eye(self.dim)
-        np.fill_diagonal(self.D, 1/self.init_alphas)
+        np.fill_diagonal(self.D, self.init_alphas)
 
         # To be used in self._sample_alpha()
         self.c_ = np.full(self.dim, self.c+0.5)
@@ -420,7 +380,7 @@ class LinearRegressionARD(LinearRegression):
     def _determine_alpha(self):
         self.alpha_hat = np.empty(self.dim)
         for i, w in enumerate(self.ws.T):
-            hist, edges = np.histogram(w, bins='scott')
+            hist, edges = np.histogram(w[self.n_gibbs//4], bins='scott')
             self.alpha_hat[i]=edges[hist.argmax()+1]
         return self.alpha_hat
 
@@ -452,7 +412,7 @@ class PolyFunc:
     so I can use them as latex plot titles later so I made
     this class.
 
-    (To be honest I just wanted to apply my newfound Regex knowledge)
+    (To be honest I just wanted to apply my newfound RegEx knowledge)
     '''
     def __init__(self, strfunc: str):
         '''
@@ -524,7 +484,7 @@ class PolyFunc:
         plt.tight_layout()
         plt.show()
 
-    def _show3d(self, figsize=(4,3)):
+    def _show3d(self, figsize=(4,3), show: bool=True):
         from mpl_toolkits.mplot3d import Axes3D
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111, projection='3d')
@@ -536,16 +496,17 @@ class PolyFunc:
                           self(points).reshape(D[0].shape),
                           color='red', alpha=0.2)
 
-        plt.setp(ax, xlabel=self.vars[0], ylabel=self.vars[1],
-                 zlabel='z')
-
+        plt.setp(ax, xlabel=self.vars[0], ylabel=self.vars[1], zlabel='z')
         plt.tight_layout()
 
         # title = figdict[self.strfunc]
         # titley = title.split('.')[0]
         # ax.set_title(f'${titley}={self.strfunc}$')
         # plt.savefig(figdict[self.strfunc])
-        plt.show()
+        if show: 
+            plt.show()
+        else: 
+            return fig, ax
 
     def show(self, figsize=(5,4)):
         if self.n_vars == 1: self._show2d(figsize)
@@ -582,36 +543,193 @@ class PolyFunc:
             # There exists higher order factors
             return int(max(factors))
             
+    def get_weights(self, weight_dict: dict):
+        '''
+        Given a dictionary of factors and weights, i.e factors as keys
+        and weights (coefficients) as values, returns an array weights
+        that is compitable with Sklearn's polynomial features. 
+        '''
+        PolyFeats = PolynomialFeatures(degree=self.get_degree())\
+               .fit(np.zeros((2,self.n_vars)))
+        features = PolyFeats.get_feature_names(self.vars)
+        features = [feat.replace(' ','') for feat in features]
+        weights = [weight_dict.setdefault(feat, 0) for feat in features]
+        return np.array(weights)
+        # for feature, weight in zip(features, weights):
+            # print(feature,':',weight)
+        # print()
+
+    def plot_w_hat(self, model: LinearRegression):
+        points, D = self._get_domain()
+        w_hat = model.w_hat
+
+        points = PolynomialFeatures(degree=self.get_degree()).fit_transform(points)
+
+        w = w_hat[:points.shape[1]]
+        z = w@points.T
+
+        fig, ax = self._show3d(show=False)
+        
+        ax.plot_wireframe(D[0], D[1],
+                          z.reshape(D[0].shape),
+                          color='navy', alpha=0.2)
+        plt.show()
+
+def gibbs_MAE(model: LinearRegression, n: int=64):
+    '''
+    Choose n different sets of model parameters 
+    and then calculate the mean of the absolute predictive errors 
+    of each set if model parameters. 
+    '''
+    ws = model.ws[model.n_gibbs//4:]
+    ws = ws[np.random.choice(np.arange(model.n_gibbs//4), size=n, 
+                             replace=False)]
+    y_hats = model.X@ws.T
+    mae_wrt_ws = np.mean(abs((y_hats - model.y.reshape(-1,1))), axis=0)
+    return mae_wrt_ws
+
 if __name__ == '__main__':
     import re 
     import pandas as pd 
     from pprint import pprint 
 
-    def simulation():
-        polynomials=[
-            '-4x+20y+69',
-            '69x+69y-420',
-            'x^2-2y^2',
-            'xy-x^2+y^2-420',
-            '-x^3+42x^2-20x-y^3+42y^2-20y+69',
-            '2x^3-y^3-3xy^2+3x^2y+x^3-3yx+69',
-        ]
+    def feat_names(gibby):
+        names=gibby.PolyTransformer\
+                   .get_feature_names(['x','y','z','u','v','t'])
+        vals=gibby.w_hat
+        for name, val in zip(names,vals):
+            print(name,':',val)
+        
+    def poly_from_dicts(dicts):
+        gen_polys = []
+        for stuff in weight_dicts:
+            polystring = ''
+            for key, val in stuff.items():
+                if val >= 0:
+                    if val == 1:
+                        polystring += '+'+key
+                    else:
+                        polystring += '+'+str(val)+key
+                else: 
+                    if val == -1:
+                        polystring += '-'+key
+                    else:
+                        polystring += str(val)+key
+                
+            if polystring[0] == '+':
+                polystring = polystring.strip('+')
+            polystring = polystring.rstrip('1')
+            gen_polys.append(polystring)
+        return gen_polys
 
-        figdict = {eq:f'f_{i}.pdf' for i, eq in enumerate(polynomials, start=1)}
+    # Functions should be written in simple form, 
+    # i.e write 2x + 2x as 4x, 40+40 as 80, 3xy+2xy as 5xy etc...
+    polynomials=[
+        '-4x+20y+69',
+        '69x+69y-420',
+        'x^2-2y^2',
+        'xy-x^2+y^2-420',
+        '-x^3+42x^2-20x-y^3+42y^2-20y+69',
+        '2x^3-y^3-3xy^2+3x^2y+x^3-3yx+69',
+    ]
 
-        kwarglist=[
-            dict(show=False, std=69, x_sampler='expo', scale=1/0.2),
-            dict(show=False, std=420, x_sampler='normal', mean=69, sigma=4),
-            dict(show=False, std=69, x_sampler='uniform', low=-16, high=16),
-            dict(show=False, std=69, x_sampler='normal', mean=0, sigma=8),
-            dict(show=False, std=420, x_sampler='expo', scale=1/0.15),
-            dict(show=False, std=69, x_sampler='uniform', low=-6, high=6)
-        ]
+    # I kind of shot myself in the foot by making the PolyFunc class
+    # It is really difficult to calculate parameter mse using it.
+    # This is not optimal, but I need a way to calculate parameter mse. 
+    # The dictionary contains factors as keys, and coefficients as values
+    weight_dicts = [
+        {'x':-4, 'y':20 ,'1':69,},
+        {'x':69, 'y':69 ,'1':-420,},
+        {'x^2':1, 'y^2':-2 ,'1':0,},
+        {'xy':1, 'x^2':-1, 'y^2':1, '1':-420,},
+        {'x^3':-1, 'x^2':42, 'x':-20, 'y^3':-1, 'y^2':42, 'y':-20 ,'1':69,},
+        {'x^3':2, 'y^3':-1, 'xy^2':-3, 'x^2y':3, 'x^3':1, 'yx':-3 ,'1':69,},
+    ]
+        
+    figdict = {eq:f'f_{i}.pdf' for i, eq in enumerate(polynomials, start=1)}
 
+    kwarglist=[
+        dict(show=False, std=22, x_sampler='expo', scale=1/0.2),
+        dict(show=False, std=420, x_sampler='normal', mean=69, sigma=4),
+        dict(show=False, std=69, x_sampler='uniform', low=-16, high=16),
+        dict(show=False, std=22, x_sampler='normal', mean=0, sigma=8),
+        dict(show=False, std=420, x_sampler='expo', scale=1/0.15),
+        dict(show=False, std=69, x_sampler='uniform', low=-6, high=6)
+    ]
+
+    def simulation2():
+        get_polyfunc_datas = lambda fs, kwarglist: \
+            [f.generate_data(**kwargs) for f, kwargs in zip(fs, kwarglist)]
+
+        fs1=[PolyFunc(poly) for poly in polynomials]
+        sim_data1=get_polyfunc_datas(fs1, kwarglist)
+
+        # PolyFunc objects beneath will generate noise features
+        fs2=[PolyFunc(poly+'+0z') for poly in polynomials]
+        sim_data2=get_polyfunc_datas(fs2, kwarglist)
+
+        fs3=[PolyFunc(poly+'+0z+0u') for poly in polynomials]
+        sim_data3=get_polyfunc_datas(fs3, kwarglist)
+        
+        fs4=[PolyFunc(poly+'+0z+0u+0v') for poly in polynomials]
+        sim_data4=get_polyfunc_datas(fs4, kwarglist)
+        
+        dicto=dict(
+            noise_features=[],
+            function=[f'$f_{i}$' for i in range(1,len(polynomials)+1)]*4,
+            degree=[],
+            ARD_MAE=[],
+            Regular_MAE=[],
+            Regular_over_ARD=[]
+        )   
+
+        mse = lambda w_true, w_hat: np.mean((w_true-w_hat)**2)
+
+        ards = []
+        regs = []
+        for i, fs, sim_datas in zip(range(4), [fs1, fs2, fs3, fs4], 
+                    [sim_data1, sim_data2, sim_data3, sim_data4]):
+            temp_ards = []
+            temp_regs = []
+            for f, data, weight_dict in zip(fs, sim_datas, weight_dicts):
+            # for f, data, weight_dict in tqdm(zip(fs, sim_datas, weight_dicts)):
+                deg = int(f.get_degree())
+                JohnWick = LinearRegressionARD(
+                    n_gibbs=512, polydegree=deg).fit(*data)
+                JohnCena = LinearRegression(
+                    n_gibbs=512, polydegree=deg).fit(*data)
+        
+                temp_ards.append(JohnWick)
+                temp_ards.append(JohnCena)
+    
+                ard_mae = gibbs_MAE(JohnWick).mean()
+                regular_mae = gibbs_MAE(JohnCena).mean()
+
+                dicto['noise_features'].append(i)
+                dicto['degree'].append(deg)
+                dicto['ARD_MAE'].append(ard_mae)
+                dicto['Regular_MAE'].append(regular_mae)
+                dicto['Regular_over_ARD'].append(regular_mae/ard_mae)
+
+            ards.append(temp_ards)
+            regs.append(temp_regs)
+
+        df = pd.DataFrame(dicto).set_index(['noise_features','function'])
+        latex = df.to_latex(index=True, float_format=lambda x: f'{x:.2f}')\
+                    .replace(r'\$','$')\
+                    .replace('f\\_','f_')\
+                    .replace(r'\textasciicircum ','^')
+
+        print(latex)
+        df.to_csv('simulation_results_mse.csv')
+
+    simulation2()
+
+    def simulation_old():
         fs1=[PolyFunc(poly) for poly in polynomials]
         sim_data1=[f.generate_data(**kwargs) for f, kwargs in zip(fs1, kwarglist)]
 
-        # PolyFunc object beneath will generate noise features
+        # PolyFunc objects beneath will generate noise features
         fs2=[PolyFunc(poly+'+0z') for poly in polynomials]
         sim_data2=[f.generate_data(**kwargs) for f, kwargs in zip(fs2, kwarglist)]
 
@@ -679,61 +797,6 @@ if __name__ == '__main__':
 
         print(latex)
         df.to_csv('simulation_results.csv')
-
-    def simulation2():
-        polynomials=[
-            '-4x+20y+69',
-            '69x+69y-420',
-            'x^2-2y^2',
-            'xy-x^2+y^2-420',
-            '-x^3+42x^2-20x-y^3+42y^2-20y+69',
-            '2x^3-y^3-3xy^2+3x^2y+x^3-3yx+69',
-        ]
-
-        figdict = {eq:f'f_{i}.pdf' for i, eq in enumerate(polynomials, start=1)}
-
-        kwarglist=[
-            dict(show=False, std=69, x_sampler='expo', scale=1/0.2),
-            dict(show=False, std=420, x_sampler='normal', mean=69, sigma=4),
-            dict(show=False, std=69, x_sampler='uniform', low=-16, high=16),
-            dict(show=False, std=69, x_sampler='normal', mean=0, sigma=8),
-            dict(show=False, std=420, x_sampler='expo', scale=1/0.15),
-            dict(show=False, std=69, x_sampler='uniform', low=-6, high=6)
-        ]
-
-        fs1=[PolyFunc(poly) for poly in polynomials]
-        sim_data1=[f.generate_data(**kwargs) for f, kwargs in zip(fs1, kwarglist)]
-
-        samplers = ['Unif(-2,20)', 
-                    'Exp(5)', 
-                    'N(69, 4)', 
-                    'N(0,8)', 
-                    'Exp(5)', 
-                    'Unif(-6,6)']*5
-
-        dicto=dict(
-            noise_features=[],
-            function=[f'$f_{i}$' for i in range(1,len(polynomials)+1)]*5,
-            degrees=[],
-            ARD_BICS=[],
-            Regular_BICS=[],
-            ARD_AICS=[],
-            Regular_AICS=[],
-        )   
-
-        JohnCena = LinearRegressionARD(polydegree=3, n_gibbs=4096)
-        JohnCena.fit(*sim_data1[3])
-
-        print(JohnCena.PolyTransformer.get_feature_names(['x','y']))
-        print(JohnCena.w_hat)
-        
-        JohnCena = LinearRegression(polydegree=3, n_gibbs=4096)
-        JohnCena.fit(*sim_data1[3])
-
-        print(JohnCena.PolyTransformer.get_feature_names(['x','y']))
-        print(JohnCena.w_hat)
-
-    simulation2()
 
     def real():
         df = pd.read_csv('Lung_cancer_small.csv')

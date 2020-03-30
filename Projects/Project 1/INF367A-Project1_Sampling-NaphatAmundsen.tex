@@ -201,10 +201,10 @@
                 \toprule
                 function & domain distribution & noise distribution \\ 
                 \midrule
-                $f_1(x,y)$ & $\operatorname{Exp}(\text{rate}=5)$    & $N(0,69)$  \\
+                $f_1(x,y)$ & $\operatorname{Exp}(\text{rate}=5)$    & $N(0,22)$  \\
                 $f_2(x,y)$ & $N(\text{mean}=69, \text{std}=4)$      & $N(0,420)$ \\
                 $f_3(x,y)$ & $\operatorname{Unif}(\min=-2,\max=20)$ & $N(0,69)$  \\ 
-                $f_4(x,y)$ & $N(\text{mean}=0, \text{std}=8)$       & $N(0,69)$  \\
+                $f_4(x,y)$ & $N(\text{mean}=0, \text{std}=8)$       & $N(0,22)$  \\
                 $f_5(x,y)$ & $\operatorname{Exp}(\text{rate}=5)$    & $N(0,420)$ \\
                 $f_6(x,y)$ & $\operatorname{Unif}(\min=-6,\max=6)$  & $N(0,69)$  \\
                 \bottomrule
@@ -224,50 +224,42 @@
         \end{figure}
     
     \subsection{Regression on the generated data}
-        We fit regression models using ARD and without ARD to assess the differences in performance. We use BIC and AIC as the performance metrics. To assess the models' performances under presence of irrelevant features, we simply a add few extra features to the data that does not affect the response variables. 
-
+        We fit regression models using ARD and without ARD to assess the differences in performance. We use the mean squared error between the true and estimated parameters. To assess the models' performances under presence of irrelevant features, we simply a add few extra features to the data that does not affect the response variables.
         \begin{table}[H]
             \centering
             \caption{"noise\_features" column indicates number of added irrelevant features to the data. The degree column indicates which degree the polynomial regression was done in.}
-            \begin{tabular}{llrrrrr}
+            \begin{tabular}{llrrrr}
                 \toprule
-                  &       &  degrees &  ARD\_BICS &  Regular\_BICS &  ARD\_AICS &  Regular\_AICS \\
-                noise\_features & function &          &           &               &           &               \\
+                  &       &  degree &  ARD MAE &  Regular MAE &  Regular over ARD \\
+                noise features & function &         &          &              &                   \\
                 \midrule
-                0 & $f_1$ &        1 &   -742.53 &       -741.90 &     11.45 &         11.44 \\
-                & $f_2$ &        1 &  -2489.53 &      -2408.57 &     38.74 &         37.48 \\
-                & $f_3$ &        2 &   -743.42 &       -743.71 &     11.33 &         11.33 \\
-                & $f_4$ &        2 &   -747.88 &       -747.90 &     11.40 &         11.40 \\
-                & $f_5$ &        3 &  -2315.36 &      -2361.94 &     35.71 &         36.44 \\
-                & $f_6$ &        3 &   -755.58 &       -756.19 &     11.34 &         11.35 \\
+                0 & $f_1$ &       1 &    18.27 &       109.55 &              6.00 \\
+                & $f_2$ &       1 &   336.33 &      8914.98 &             26.51 \\
+                & $f_3$ &       2 &    48.91 &        48.86 &              1.00 \\
+                & $f_4$ &       2 &    17.65 &       249.43 &             14.13 \\
+                & $f_5$ &       3 &   314.27 &      2326.37 &              7.40 \\
+                & $f_6$ &       3 &    49.44 &        59.51 &              1.20 \\
                 \midrule
-                1 & $f_1$ &        1 &   -745.95 &       -745.84 &     11.45 &         11.45 \\
-                & $f_2$ &        1 &  -2407.50 &      -2359.50 &     37.42 &         36.67 \\
-                & $f_3$ &        2 &   -768.33 &       -768.21 &     11.54 &         11.54 \\
-                & $f_4$ &        2 &   -755.14 &       -756.15 &     11.33 &         11.35 \\
-                & $f_5$ &        3 &  -2504.77 &      -2457.18 &     38.22 &         37.48 \\
-                & $f_6$ &        3 &   -809.28 &       -808.85 &     11.73 &         11.72 \\
+                1 & $f_1$ &       1 &    18.57 &        82.77 &              4.46 \\
+                & $f_2$ &       1 &   347.24 &      8848.73 &             25.48 \\
+                & $f_3$ &       2 &    54.41 &        55.03 &              1.01 \\
+                & $f_4$ &       2 &    15.18 &       232.57 &             15.32 \\
+                & $f_5$ &       3 &   322.23 &      1954.00 &              6.06 \\
+                & $f_6$ &       3 &    53.24 &        56.67 &              1.06 \\
                 \midrule
-                2 & $f_1$ &        1 &   -741.06 &       -741.23 &     11.33 &         11.34 \\
-                & $f_2$ &        1 &  -2411.29 &      -2289.00 &     37.43 &         35.52 \\
-                & $f_3$ &        2 &   -784.64 &       -784.20 &     11.57 &         11.56 \\
-                & $f_4$ &        2 &   -780.94 &       -781.03 &     11.51 &         11.51 \\
-                & $f_5$ &        3 &  -2239.91 &      -2209.62 &     33.42 &         32.94 \\
-                & $f_6$ &        3 &   -871.92 &       -871.69 &     12.04 &         12.04 \\
+                2 & $f_1$ &       1 &    16.91 &        72.16 &              4.27 \\
+                & $f_2$ &       1 &   312.72 &      8816.07 &             28.19 \\
+                & $f_3$ &       2 &    51.41 &        51.67 &              1.01 \\
+                & $f_4$ &       2 &    16.46 &       218.45 &             13.27 \\
+                & $f_5$ &       3 &   297.41 &      1975.98 &              6.64 \\
+                & $f_6$ &       3 &    54.04 &        59.68 &              1.10 \\
                 \midrule
-                3 & $f_1$ &        1 &   -745.05 &       -745.03 &     11.35 &         11.35 \\
-                & $f_2$ &        1 &  -2637.77 &      -2365.53 &     40.93 &         36.67 \\
-                & $f_3$ &        2 &   -816.72 &       -816.67 &     11.80 &         11.80 \\
-                & $f_4$ &        2 &   -817.49 &       -817.46 &     11.82 &         11.81 \\
-                & $f_5$ &        3 &  -2810.69 &      -2761.35 &     41.40 &         40.63 \\
-                & $f_6$ &        3 &   -969.90 &       -970.43 &     12.64 &         12.65 \\
-                \midrule
-                4 & $f_1$ &        1 &   -759.39 &       -759.86 &     11.53 &         11.54 \\
-                & $f_2$ &        1 &  -2553.25 &      -2474.29 &     39.56 &         38.33 \\
-                & $f_3$ &        2 &   -834.29 &       -834.76 &     11.77 &         11.77 \\
-                & $f_4$ &        2 &   -848.20 &       -848.40 &     11.98 &         11.99 \\
-                & $f_5$ &        3 &  -2653.88 &      -2572.46 &     37.70 &         36.43 \\
-                & $f_6$ &        3 &  -1087.62 &      -1087.65 &     13.23 &         13.23 \\
+                3 & $f_1$ &       1 &    16.69 &        69.08 &              4.14 \\
+                & $f_2$ &       1 &   325.36 &      8756.69 &             26.91 \\
+                & $f_3$ &       2 &    55.46 &        55.37 &              1.00 \\
+                & $f_4$ &       2 &    17.47 &       177.05 &             10.13 \\
+                & $f_5$ &       3 &   335.03 &      2139.92 &              6.39 \\
+                & $f_6$ &       3 &    54.70 &        59.95 &              1.10 \\
                 \bottomrule
             \end{tabular}
         \end{table}
