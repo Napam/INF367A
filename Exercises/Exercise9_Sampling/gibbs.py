@@ -28,7 +28,7 @@ class LinRegGibbs:
             self.ws[i] = multivariate_normal.rvs(mean=m, cov=S, size=1)
 
             p = y - self.ws[i]@X.T
-            self.betas[i] = gamma.rvs(self.a+len(X)/2,1/(self.b+0.5*p.T@p))
+            self.betas[i] = gamma.rvs(a=self.a+len(X)/2,scale=1/(self.b+0.5*p.T@p))
     
     def posterior(self):
         epsilon = 1e-12
@@ -71,26 +71,24 @@ class LinRegGibbs:
         # plt.savefig('gibbs.pdf')
         plt.show()
 
-        xrange = np.linspace(1.5,2.5,1000)
-        slope_hist = rv_histogram(np.histogram(self.ws[:,0], bins=100))
-        slope = xrange[slope_hist.pdf(xrange).argmax()]
+        hist, edges = np.histogram(self.ws[:,0], bins=100)
+        slope = edges[hist.argmax()-1]
         
-        xrange = np.linspace(200,420,1000)
-        intercept_hist = rv_histogram(np.histogram(self.ws[:,1], bins=69))
-        intercept = xrange[intercept_hist.pdf(xrange).argmax()]
+        hist, edges = np.histogram(self.ws[:,1], bins=100)
+        intercept = edges[hist.argmax()]
         return intercept, slope
 
 if __name__ == '__main__':
     df = pd.read_csv('new_york_bicycles2.csv')
     X_whole = df.values
     X = np.column_stack([X_whole[:,0], np.ones(len(X_whole))])
-    y = X_whole[:,1]
+    y = X_whole[:,1]+10000
 
     lol = LinRegGibbs()
-    lol.fit(X, y, n=10000)
+    lol.fit(X, y, n=1024)
     intercept, slope = lol.plot_result()
 
-    xrange = np.linspace(0,5500,1000)
+    xrange = np.linspace(0,5000,1000)
     fig, ax = plt.subplots(figsize=(7,5))
     ax.scatter(*X_whole.T)
     ax.plot(xrange, slope*xrange+intercept, c='red')
