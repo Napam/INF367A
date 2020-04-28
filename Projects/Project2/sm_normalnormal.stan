@@ -33,7 +33,7 @@ parameters {
 
 model {
     matrix[p,q] X_hat;
-    int row_idx;git s
+    int row_idx;
     int col_idx;
     int rating;
     int R[3];
