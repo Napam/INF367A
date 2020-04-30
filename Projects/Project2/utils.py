@@ -30,14 +30,18 @@ def StanModel_cache(model_code, model_name=None, cache_dir='stan_cache', **kwarg
     
     # Clean text avoid stupid recompilations
 
+    # Removes multiline comments
+    to_hash = re.sub('(\/\*(.|\n)*?\*\/)', '', model_code)
     # Removes comments
-    model_code = re.sub('(//.+)', '', model_code) 
-    # Turns multiple newlines to one
-    model_code = re.sub('(\n{2,})', '\n', model_code) 
-    # Turns multie spaces into one
-    model_code = re.sub('([ \t]{2,})', ' ', model_code)  
+    to_hash = re.sub('(//.+)', '', to_hash)
+    # Removes trailing spaces
+    to_hash = re.sub('([ \t]{2,})', ' ', to_hash)
+    # Removes empty space
+    to_hash = re.sub('(\s+\n)', '\n', to_hash)
+    # Removes multiple newlines
+    to_hash = re.sub('(\n{2,})', '\n', to_hash)
 
-    code_hash = md5(model_code.encode('ascii')).hexdigest()
+    code_hash = md5(to_hash.encode('ascii')).hexdigest()
     if model_name is None:
         cache_fn = 'cached-model-{}.pkl'.format(code_hash)
     else:

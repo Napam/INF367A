@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 class BaseStanFactorizer:
     '''
-    Template class for classes for matrix decomposition
+    Template class for classes for matrix factorization using Stan
     '''
     def __init__(self):
         self.fitted = False
@@ -118,7 +118,7 @@ class BaseStanFactorizer:
     
 class SimpleFactorizer(BaseStanFactorizer):
     '''
-    Class for probabilistic matrix decomposition using MCMC.
+    Class for probabilistic matrix factorization using Stan.
     '''
     def __init__(self, n_components: int=2, mu_u: float=1, sigma_u: float=5,
                  mu_v: float=1, sigma_v=5, sigma_x=1,
@@ -199,27 +199,27 @@ class SimpleFactorizer(BaseStanFactorizer):
 
 class NonNegativeFactorizer(BaseStanFactorizer):
     '''
-    Class for probabilistic matrix decomposition using MCMC.
+    Class for probabilistic non negative matrix factorization using Stan.
     '''
-    def __init__(self, n_components: int=2, mu_u: float=1, sigma_u: float=5,
-                 mu_v: float=1, sigma_v=5, sigma_x=1,
+    def __init__(self, n_components: int=2, a_u: float=2, b_u: float=1,
+                 a_v: float=2, b_v: float=1, a_beta: float=2, b_beta: float=8,
                  stanfile: str='sm_nmf.stan', cache_name: str='nmf'):
         '''
         Factorization: X \approx UV, where X is the dense matrix
 
         Model:
-        U ~ N(mu_u, sigma_u)
-        V ~ N(mu_v, sigma_v)
-        X ~ N(UV, sigma_x)
+        U ~ N(a_u, b_u)
+        V ~ N(a_v, b_v)
+        X ~ N(UV, b_x)
 
         Parameters
         -----------
         n_components: Embedding dimension
-        mu_u: mean of elements in U
-        sigma_u: std of elements in U
-        mu_v: mean of elements in
-        sigma_v: std of elements in V
-        sigma_x: std of elements in X
+        a_u: mean of elements in U
+        b_u: std of elements in U
+        a_v: mean of elements in
+        b_v: std of elements in V
+        b_x: std of elements in X
         stanfile: file with stancode
         cache_name: name for compiled model
         '''
@@ -230,17 +230,18 @@ class NonNegativeFactorizer(BaseStanFactorizer):
         self.n_components = n_components
         self.components_ = None
 
-        self.mu_u = mu_u
-        self.sigma_u = sigma_u
+        self.a_u = a_u
+        self.b_u = b_u
 
-        self.mu_v = mu_v
-        self.sigma_v = sigma_v
+        self.a_v = a_v
+        self.b_v = b_v
 
-        self.sigma_x = sigma_x
+        self.a_beta = b_beta
+        self.b_beta = b_beta
 
     def _predictive_sample(self, P):
         self.assert_fitted()
-        return np.random.normal(loc=P, scale=self.sigma_x, size=P.shape)
+        return np.random.normal(loc=P, scale=self.betas, size=P.shape)
 
     def fit_transform(self, df: pd.DataFrame, **kwargs):
         '''
@@ -262,16 +263,16 @@ class NonNegativeFactorizer(BaseStanFactorizer):
 
         datadict = dict(
             n_components=self.n_components, n=len(df), p=self.p,
-            q=self.q, df=df, mu_u=self.mu_u, sigma_u=self.sigma_u,
-            mu_v=self.mu_v, sigma_v=self.sigma_v, sigma_x=self.sigma_x
+            q=self.q, df=df, a_u=self.a_u, b_u=self.b_u,
+            a_v=self.a_v, b_v=self.b_v, a_beta=self.a_beta, b_beta=self.b_beta
         )
 
         self.code = utils.get_stan_code(self.stanfile)
         self.sm = utils.StanModel_cache(self.code, model_name=self.cache_name)
 
         self.stanfit = self.sm.sampling(datadict, **kwargs)
-        self.Us, self.Vs, self.lp__ =\
-            self.stanfit['U'], self.stanfit['V'], self.stanfit['lp__']
+        self.Us, self.Vs, self.betas, self.lp__ =\
+            self.stanfit['U'], self.stanfit['V'], self.stanfit['beta'], self.stanfit['lp__']
 
         # Set fitted flag
         self.set_fitted()
@@ -280,7 +281,7 @@ class NonNegativeFactorizer(BaseStanFactorizer):
 
 class ARD_Factorizer(BaseStanFactorizer):
     '''
-    Class for probabilistic matrix decomposition using MCMC.
+    Class for probabilistic ARD matrix factorization using Stan.
     '''
     def __init__(self, n_components: int=2, mu_u: float=1, sigma_u: float=5,
                  mu_v: float=1, sigma_v=5, sigma_x=1,

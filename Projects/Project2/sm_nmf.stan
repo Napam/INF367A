@@ -13,7 +13,7 @@ data {
     int<lower=1> n_components; // Dimension of embeddings
     int<lower=0> n; // rows in data matrix
     int<lower=0> df[n,3]; // data matrix (is df.values)
-                 // rows should be [row_idx, col_idx, rating]
+                          // rows should be [row_idx, col_idx, rating]
 
     int<lower=0> p; // Dense matrix representation
     int<lower=0> q; // dimensions, i.e shape(D) = p x q
@@ -28,7 +28,7 @@ data {
 
     // Prior parameters for beta ~ gamma(a_beta, b_beta)
     real<lower=0> a_beta; 
-    real<lower=0> a_beta; 
+    real<lower=0> b_beta; 
 }
 
 transformed data {
@@ -43,8 +43,8 @@ transformed data {
 }
 
 parameters {
-    matrix[p, n_components] U;
-    matrix[n_components, q] V;
+    matrix<lower=0>[p, n_components] U;
+    matrix<lower=0>[n_components, q] V;
     real<lower=0> beta;
 }
 
@@ -57,7 +57,7 @@ model {
 
     to_vector(U) ~ gamma(a_u, b_u);
     to_vector(V) ~ gamma(a_v, b_v);
-    beta ~ gamma(a_beta, b_beta)
+    beta ~ gamma(a_beta, b_beta);
 
     X_hat = U*V;
 
