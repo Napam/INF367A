@@ -77,30 +77,6 @@ def get_ml100k_data(directory:str, subsample_top_users: int=None,
         # pd.value_counts sorts by default
         topusers = pd.value_counts(df_users.user_id).index.values[:subsample_top_users]
         df_users = df_users.loc[df_users.user_id.isin(topusers)]
-<<<<<<< HEAD
-=======
-
-    if subsample_top_items is not None:
-        # pd.value_counts sorts by default
-        topitems = pd.value_counts(df_users.item_id).index.values[:subsample_top_items]
-        df_users = df_users.loc[df_users.item_id.isin(topitems)]
-
-    return df_users, df_item_features.astype(float), df_item_metadata
-
-class BaseMCMCDecompositor:
-    '''
-    Template class for classes for matrix decomposition
-    '''
-    @abstractmethod
-    def fit(self, X: np.ndarray):
-        pass
-
-    def transform(self, X: np.ndarray):
-        pass
-
-    def inverse_transform(self, X):
-        pass
->>>>>>> 78fbd694220dc82233e768aa89b98c60a3f21650
 
     if subsample_top_items is not None:
         # pd.value_counts sorts by default
