@@ -11,41 +11,26 @@ from matplotlib import pyplot as plt
 np.set_printoptions(precision=2, suppress=True)
 
 A, y = make_blobs(n_samples=12, n_features=6)
-A = abs(A / A.max()) * 6
-A = A.astype(int)
-# A = sparse.random(10, 6, format='dense', density=0.5, dtype=int) % 6
-B = np.array([[0,0,4,2,2,3]])
-P = PCA(4)
-P.fit(A)
-X = (A-A.mean(axis=0))@P.components_.T
-R = (X@P.components_+P.mean_)
 
-print('B:', B.shape)
-print(B)
-print()
+import re 
 
-print('A:',A.shape)
-print(A)
-print()
+txt = '''
+import numpy as              np
+// fuck lol fasdfasd fasdf asdf asdf asdf
+// adfads fadsf asdf asdffasdf 
 
-print('P:', P.components_.shape)
-print(P.components_)
-print()
+pd.DataFrame
 
-print('X:', X.shape)
-print(X)
-print()
+// asdfas dfadfa 
+// adfasdf adsf asdf asdf as
 
-print('R:', R.shape)
-print(R)
-print()
+np.arange(10)
+'''
+txt = re.sub('(//.+)', '', txt)
+txt = re.sub('(\n{2,})', '\n', txt)
+txt = re.sub('([ \t]{2,})', ' ', txt)
 
-pred = (B-P.mean_)@P.components_.T
-pred = pred@P.components_+P.mean_
-
-print('Pred: ', pred.shape)
-print(pred)
-
+print(txt)
 
 
 

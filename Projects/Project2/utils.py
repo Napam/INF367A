@@ -27,6 +27,16 @@ def get_stan_code(filename: str):
 
 def StanModel_cache(model_code, model_name=None, cache_dir='stan_cache', **kwargs):
     """Use just as you would `stan`"""
+    
+    # Clean text avoid stupid recompilations
+
+    # Removes comments
+    model_code = re.sub('(//.+)', '', model_code) 
+    # Turns multiple newlines to one
+    model_code = re.sub('(\n{2,})', '\n', model_code) 
+    # Turns multie spaces into one
+    model_code = re.sub('([ \t]{2,})', ' ', model_code)  
+
     code_hash = md5(model_code.encode('ascii')).hexdigest()
     if model_name is None:
         cache_fn = 'cached-model-{}.pkl'.format(code_hash)

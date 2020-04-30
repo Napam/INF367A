@@ -18,13 +18,17 @@ data {
     int<lower=0> p; // Dense matrix representation
     int<lower=0> q; // dimensions, i.e shape(D) = p x q
 
-    real mu_u; // Prior mean of elements in U matrix
-    real<lower=0> sigma_u; // Prior std of elements in U matrix
+    // Prior parameters for U ~ gamma(a_u, b_u)
+    real<lower=0> a_u; 
+    real<lower=0> b_u; 
 
-    real mu_v; // Prior mean of elements in V matrix
-    real<lower=0> sigma_v; // Prior std of elemens in V matrix
+    // Prior parameters for V ~ gamma(a_v, b_v)
+    real<lower=0> a_v; 
+    real<lower=0> b_v; 
 
-    real<lower=0> sigma_x; // rating ~ N(U*V, sigma_x) 
+    // Prior parameters for beta ~ gamma(a_beta, b_beta)
+    real<lower=0> a_beta; 
+    real<lower=0> a_beta; 
 }
 
 transformed data {
@@ -41,6 +45,7 @@ transformed data {
 parameters {
     matrix[p, n_components] U;
     matrix[n_components, q] V;
+    real<lower=0> beta;
 }
 
 model {
@@ -50,8 +55,9 @@ model {
     int rating;
     int R[3];
 
-    to_vector(U) ~ gamma(mu_u, sigma_u);
-    to_vector(V) ~ gamma(mu_v, sigma_v);
+    to_vector(U) ~ gamma(a_u, b_u);
+    to_vector(V) ~ gamma(a_v, b_v);
+    beta ~ gamma(a_beta, b_beta)
 
     X_hat = U*V;
 
@@ -62,6 +68,6 @@ model {
         col_idx = R[2];
         rating = R[3];
 
-        rating ~ normal(X_hat[row_idx, col_idx], sigma_x);
+        rating ~ normal(X_hat[row_idx, col_idx], beta);
     }
 }

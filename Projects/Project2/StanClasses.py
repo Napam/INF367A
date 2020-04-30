@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import utils
 from matplotlib import pyplot as plt
+
 class BaseStanFactorizer:
     '''
     Template class for classes for matrix decomposition
@@ -202,7 +203,7 @@ class NonNegativeFactorizer(BaseStanFactorizer):
     '''
     def __init__(self, n_components: int=2, mu_u: float=1, sigma_u: float=5,
                  mu_v: float=1, sigma_v=5, sigma_x=1,
-                 stanfile: str='sm_simple.stan', cache_name: str='simple'):
+                 stanfile: str='sm_nmf.stan', cache_name: str='nmf'):
         '''
         Factorization: X \approx UV, where X is the dense matrix
 
