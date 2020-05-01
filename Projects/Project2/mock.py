@@ -99,7 +99,25 @@ txt = re.sub('([ \t]{2,})', ' ', txt)
 txt = re.sub('(\s+\n)', '\n', txt)
 txt = re.sub('(\n{2,})', '\n', txt)
 
-print(txt)
+# print()
+# A = np.arange(3*2*2).reshape(3,2,2)
+# B = np.array([[1,0],[1,1],[1,2]])
+# print(A)
+# print('\n')
+# print(B)
+# print('\n')
 
+A = np.ones((3,3,2))
+B = np.array([
+    [0,0],
+    [1,1],
+    [2,2],
+])
+
+print(A)
+print(B)
+print()
+print(np.einsum('ijk,lk->ijk', A,B).astype('int'))
+print(A*B[:,np.newaxis,:].repeat(3, axis=1))
 
 

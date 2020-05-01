@@ -29,7 +29,7 @@ class BaseStanFactorizer:
         return self
 
     @abstractmethod
-    def _predictive_sample(self, P: np.ndarray) -> np.ndarray:
+    def _likelihood_sample(self, P: np.ndarray, picks: np.ndarray) -> np.ndarray:
         '''
         Function used for predictive sampling
         '''
@@ -70,7 +70,7 @@ class BaseStanFactorizer:
 
         ax.errorbar(range(n), means,
                     yerr=[means-lower_bounds, upper_bounds-means],
-                    fmt='o', linewidth=2, *args, **kwargs)
+                    fmt='o', *args, **kwargs)
 
     def ci(self, n_elements: int=20, n_samples: int=1000, p=0.95,
         show: bool=False, ax: 'matplotlib.Axes'=None, *args, **kwargs):
@@ -100,7 +100,7 @@ class BaseStanFactorizer:
         # Sample from predictive distribution
         picks = np.random.randint(0, len(Xs), n_samples)
         P = Xs[picks][:,row_inds, col_inds]
-        P = self._predictive_sample(P)
+        P = self._likelihood_sample(P, picks)
         P.sort(axis=0)
 
         # Get credible intervals of samples from predictive distribution
@@ -147,7 +147,6 @@ class SimpleFactorizer(BaseStanFactorizer):
         self.cache_name = cache_name
 
         self.n_components = n_components
-        self.components_ = None
 
         self.mu_u = mu_u
         self.sigma_u = sigma_u
@@ -157,7 +156,7 @@ class SimpleFactorizer(BaseStanFactorizer):
 
         self.sigma_x = sigma_x
 
-    def _predictive_sample(self, P):
+    def _likelihood_sample(self, P, picks):
         self.assert_fitted()
         return np.random.normal(loc=P, scale=self.sigma_x, size=P.shape)
 
@@ -228,7 +227,6 @@ class NonNegativeFactorizer(BaseStanFactorizer):
         self.cache_name = cache_name
 
         self.n_components = n_components
-        self.components_ = None
 
         self.a_u = a_u
         self.b_u = b_u
@@ -239,9 +237,10 @@ class NonNegativeFactorizer(BaseStanFactorizer):
         self.a_beta = b_beta
         self.b_beta = b_beta
 
-    def _predictive_sample(self, P):
+    def _likelihood_sample(self, P, picks):
         self.assert_fitted()
-        return np.random.normal(loc=P, scale=self.betas, size=P.shape)
+        return np.random.normal(loc=P, scale=self.betas[picks].reshape(-1,1),
+                                size=P.shape)
 
     def fit_transform(self, df: pd.DataFrame, **kwargs):
         '''
@@ -283,9 +282,10 @@ class ARD_Factorizer(BaseStanFactorizer):
     '''
     Class for probabilistic ARD matrix factorization using Stan.
     '''
-    def __init__(self, n_components: int=2, mu_u: float=1, sigma_u: float=5,
-                 mu_v: float=1, sigma_v=5, sigma_x=1,
-                 stanfile: str='sm_simple.stan', cache_name: str='simple'):
+    def __init__(self, n_components: int=2, mu_u: float=1, mu_v: float=1,
+                 a_alpha: float=1, b_alpha: float=2, a_beta: float=1, 
+                 b_beta: float=1, stanfile: str='sm_ard.stan', 
+                 cache_name: str='ard'):
         '''
         Factorization: X \approx UV, where X is the dense matrix
 
@@ -310,19 +310,20 @@ class ARD_Factorizer(BaseStanFactorizer):
         self.cache_name = cache_name
 
         self.n_components = n_components
-        self.components_ = None
 
         self.mu_u = mu_u
-        self.sigma_u = sigma_u
-
         self.mu_v = mu_v
-        self.sigma_v = sigma_v
+        
+        self.a_alpha = a_alpha
+        self.b_alpha = b_alpha
+        
+        self.a_beta = a_beta
+        self.b_beta = b_beta
 
-        self.sigma_x = sigma_x
-
-    def _predictive_sample(self, P):
+    def _likelihood_sample(self, P, picks):
         self.assert_fitted()
-        return np.random.normal(loc=P, scale=self.sigma_x, size=P.shape)
+        return np.random.normal(loc=P, scale=self.betas[picks].reshape(-1,1),
+                                size=P.shape)
 
     def fit_transform(self, df: pd.DataFrame, **kwargs):
         '''
@@ -344,16 +345,20 @@ class ARD_Factorizer(BaseStanFactorizer):
 
         datadict = dict(
             n_components=self.n_components, n=len(df), p=self.p,
-            q=self.q, df=df, mu_u=self.mu_u, sigma_u=self.sigma_u,
-            mu_v=self.mu_v, sigma_v=self.sigma_v, sigma_x=self.sigma_x
+            q=self.q, df=df, mu_u=self.mu_u, mu_v=self.mu_v, a_alpha=self.a_alpha, 
+            b_alpha=self.b_alpha, a_beta=self.a_beta, b_beta=self.b_beta
         )
 
         self.code = utils.get_stan_code(self.stanfile)
         self.sm = utils.StanModel_cache(self.code, model_name=self.cache_name)
 
         self.stanfit = self.sm.sampling(datadict, **kwargs)
-        self.Us, self.Vs, self.lp__ =\
-            self.stanfit['U'], self.stanfit['V'], self.stanfit['lp__']
+
+        self.Us = self.stanfit['U']
+        self.Vs = self.stanfit['VT'].transpose([0,2,1])
+        self.alphas = self.stanfit['alpha']
+        self.betas = self.stanfit['beta']
+        self.lp__ = self.stanfit['lp__']
 
         # Set fitted flag
         self.set_fitted()

@@ -28,7 +28,7 @@ def get_stan_code(filename: str):
 def StanModel_cache(model_code, model_name=None, cache_dir='stan_cache', **kwargs):
     """Use just as you would `stan`"""
     
-    # Clean text avoid stupid recompilations
+    # Clean text to avoid stupid recompilations
 
     # Removes multiline comments
     to_hash = re.sub('(\/\*(.|\n)*?\*\/)', '', model_code)
@@ -38,7 +38,7 @@ def StanModel_cache(model_code, model_name=None, cache_dir='stan_cache', **kwarg
     to_hash = re.sub('([ \t]{2,})', ' ', to_hash)
     # Removes empty space
     to_hash = re.sub('(\s+\n)', '\n', to_hash)
-    # Removes multiple newlines
+    # Removes repeated newlines
     to_hash = re.sub('(\n{2,})', '\n', to_hash)
 
     code_hash = md5(to_hash.encode('ascii')).hexdigest()
