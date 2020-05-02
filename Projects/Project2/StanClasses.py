@@ -122,7 +122,8 @@ class SimpleFactorizer(BaseStanFactorizer):
     '''
     def __init__(self, n_components: int=2, mu_u: float=1, sigma_u: float=5,
                  mu_v: float=1, sigma_v=5, sigma_x=1,
-                 stanfile: str='sm_simple.stan', cache_name: str='simple'):
+                 stanfile: str='sm_simple.stan', cache_name: str='simple', 
+                 **stan_kwargs):
         '''
         Factorization: X \approx UV, where X is the dense matrix
 
@@ -155,12 +156,13 @@ class SimpleFactorizer(BaseStanFactorizer):
         self.sigma_v = sigma_v
 
         self.sigma_x = sigma_x
+        self.stan_kwargs = stan_kwargs
 
     def _likelihood_sample(self, P, picks):
         self.assert_fitted()
         return np.random.normal(loc=P, scale=self.sigma_x, size=P.shape)
 
-    def fit_transform(self, df: pd.DataFrame, **kwargs):
+    def fit_transform(self, df: pd.DataFrame):
         '''
         Parameters
         -----------
@@ -187,7 +189,7 @@ class SimpleFactorizer(BaseStanFactorizer):
         self.code = utils.get_stan_code(self.stanfile)
         self.sm = utils.StanModel_cache(self.code, model_name=self.cache_name)
 
-        self.stanfit = self.sm.sampling(datadict, **kwargs)
+        self.stanfit = self.sm.sampling(datadict, **self.stan_kwargs)
         self.Us, self.Vs, self.lp__ =\
             self.stanfit['U'], self.stanfit['V'], self.stanfit['lp__']
 
@@ -202,7 +204,8 @@ class NonNegativeFactorizer(BaseStanFactorizer):
     '''
     def __init__(self, n_components: int=2, a_u: float=2, b_u: float=1,
                  a_v: float=2, b_v: float=1, a_beta: float=2, b_beta: float=8,
-                 stanfile: str='sm_nmf.stan', cache_name: str='nmf'):
+                 stanfile: str='sm_nmf.stan', cache_name: str='nmf', 
+                 **stan_kwargs):
         '''
         Factorization: X \approx UV, where X is the dense matrix
 
@@ -236,6 +239,8 @@ class NonNegativeFactorizer(BaseStanFactorizer):
 
         self.a_beta = b_beta
         self.b_beta = b_beta
+        
+        self.stan_kwargs = stan_kwargs
 
     def _likelihood_sample(self, P, picks):
         self.assert_fitted()
@@ -269,7 +274,7 @@ class NonNegativeFactorizer(BaseStanFactorizer):
         self.code = utils.get_stan_code(self.stanfile)
         self.sm = utils.StanModel_cache(self.code, model_name=self.cache_name)
 
-        self.stanfit = self.sm.sampling(datadict, **kwargs)
+        self.stanfit = self.sm.sampling(datadict, **self.stan_kwargs)
         self.Us, self.Vs, self.betas, self.lp__ =\
             self.stanfit['U'], self.stanfit['V'], self.stanfit['beta'], self.stanfit['lp__']
 
@@ -282,10 +287,10 @@ class ARD_Factorizer(BaseStanFactorizer):
     '''
     Class for probabilistic ARD matrix factorization using Stan.
     '''
-    def __init__(self, n_components: int=2, mu_u: float=1, mu_v: float=1,
-                 a_alpha: float=1, b_alpha: float=2, a_beta: float=1, 
-                 b_beta: float=1, stanfile: str='sm_ard.stan', 
-                 cache_name: str='ard'):
+    def __init__(self, n_components: int=2, mu_u: float=0, mu_v: float=0,
+                 a_alpha: float=1, b_alpha: float=0.08, a_beta: float=2, 
+                 b_beta: float=8, stanfile: str='sm_ard.stan', 
+                 cache_name: str='ard', **stan_kwargs):
         '''
         Factorization: X \approx UV, where X is the dense matrix
 
@@ -320,12 +325,14 @@ class ARD_Factorizer(BaseStanFactorizer):
         self.a_beta = a_beta
         self.b_beta = b_beta
 
+        self.stan_kwargs = stan_kwargs
+
     def _likelihood_sample(self, P, picks):
         self.assert_fitted()
         return np.random.normal(loc=P, scale=self.betas[picks].reshape(-1,1),
                                 size=P.shape)
 
-    def fit_transform(self, df: pd.DataFrame, **kwargs):
+    def fit_transform(self, df: pd.DataFrame):
         '''
         Parameters
         -----------
@@ -352,13 +359,16 @@ class ARD_Factorizer(BaseStanFactorizer):
         self.code = utils.get_stan_code(self.stanfile)
         self.sm = utils.StanModel_cache(self.code, model_name=self.cache_name)
 
-        self.stanfit = self.sm.sampling(datadict, **kwargs)
+        self.stanfit = self.sm.sampling(datadict, **self.stan_kwargs)
 
-        self.Us = self.stanfit['U']
-        self.Vs = self.stanfit['VT'].transpose([0,2,1])
+        self.Us_raw = self.stanfit['U']
+        self.Vs_raw = self.stanfit['VT']
         self.alphas = self.stanfit['alpha']
         self.betas = self.stanfit['beta']
         self.lp__ = self.stanfit['lp__']
+
+        self.Us = self.Us_raw*self.alphas[:,np.newaxis,:]
+        self.Vs = (self.Vs_raw*self.alphas[:,np.newaxis,:]).transpose([0,2,1])
 
         # Set fitted flag
         self.set_fitted()

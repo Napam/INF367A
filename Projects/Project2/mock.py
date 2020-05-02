@@ -117,7 +117,18 @@ B = np.array([
 print(A)
 print(B)
 print()
-print(np.einsum('ijk,lk->ijk', A,B).astype('int'))
-print(A*B[:,np.newaxis,:].repeat(3, axis=1))
+print(A*B[:,np.newaxis,:])
+print()
+print(A.shape)
+print(B[:,np.newaxis,:].shape)
+
+shared_fit_kwargs = {
+    'chains':1, 
+    'n_jobs':1, 
+    'iter':1000, 
+    'thin':5, 
+    'control':{'max_treedepth':20}
+}
+
 
 

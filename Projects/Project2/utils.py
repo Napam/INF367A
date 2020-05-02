@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 import pystan
 import pickle
 from hashlib import md5
-from typing import Union
+from typing import Union, Iterable
 
 def histmax(chain: np.ndarray, bins: Union[str, int]='auto'):
     hist, edges = np.histogram(chain, bins=bins)
