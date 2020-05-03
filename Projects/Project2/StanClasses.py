@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import utils
 from matplotlib import pyplot as plt
+from typing import Iterable
 
 class BaseStanFactorizer:
     '''
@@ -72,17 +73,26 @@ class BaseStanFactorizer:
                     yerr=[means-lower_bounds, upper_bounds-means],
                     fmt='o', *args, **kwargs)
 
-    def ci(self, n_elements: int=20, n_samples: int=1000, p=0.95,
-        show: bool=False, ax: 'matplotlib.Axes'=None, *args, **kwargs):
+    def ci(self, n_elements: int=20, row_inds: Iterable=None, 
+           col_inds: Iterable=None, n_samples: int=1000, p=0.95, plot: bool=False, 
+           ax: 'matplotlib.Axes'=None, *args, **kwargs):
         '''
         Computes credible intervals first elements of matrix.
 
         Parameters
         ------------
-        n_elements: Number of elements to calculte credible intervals for
+        n_elements: Number of elements to calculte credible intervals for, 
+                    no effect if col_inds and row_inds are given.
+        row_inds: Optional, which row indices in X to show CIs for
+
+        col_inds: Optional, which column indices in X to show CIs for
+
         n_samples: Number of samples to sample from predictive distribution
+
         p: Optional, credible interval percentage, 0.95 by default
-        show: Optional, to plot credible intervals or not, False by default
+
+        plot: Optional, to plot credible intervals or not, False by default
+
         ax: Optional, plots on given ax, no effect if show is False
 
         Returns
@@ -94,8 +104,14 @@ class BaseStanFactorizer:
         # This is equivalent to Xs = np.array([U@V for U,V in zip(Us, Vs)])
         Xs = self.Us@self.Vs
 
-        # Used to extract first n_elements from predicted Xs
-        row_inds, col_inds = np.unravel_index(range(n_elements), Xs.shape[1:])
+        if (row_inds is None) or (col_inds is None):
+            assert (row_inds and col_inds) is None,\
+                "Either row_inds and col_inds are both None, or both Iterables"
+            # Used to extract first n_elements from predicted Xs
+            row_inds, col_inds = np.unravel_index(range(n_elements), Xs.shape[1:])
+        
+        assert len(row_inds) == len(col_inds),\
+            "Length mismatch between row_inds and col_inds"
 
         # Sample from predictive distribution
         picks = np.random.randint(0, len(Xs), n_samples)
@@ -110,8 +126,8 @@ class BaseStanFactorizer:
 
         lower_bounds, upper_bounds = P[lb], P[ub]
 
-        if show:
-            self._plot_ci(n_elements, P, lower_bounds, upper_bounds, ax, *args,
+        if plot:
+            self._plot_ci(len(row_inds), P, lower_bounds, upper_bounds, ax, *args,
                         **kwargs)
 
         return lower_bounds, upper_bounds
@@ -197,6 +213,89 @@ class SimpleFactorizer(BaseStanFactorizer):
         self.set_fitted()
 
         return self.Us, self.Vs
+
+class NormalFactorizer(BaseStanFactorizer):
+    '''
+    Class for probabilistic matrix factorization using Stan.
+    '''
+    def __init__(self, n_components: int=2, mu_u: float=1, sigma_u: float=5,
+                 mu_v: float=1, sigma_v=5, sigma_x=1,
+                 stanfile: str='sm_normal.stan', cache_name: str='normal', 
+                 **stan_kwargs):
+        '''
+        Factorization: X \approx UV, where X is the dense matrix
+
+        Model:
+        U ~ N(mu_u, sigma_u)
+        V ~ N(mu_v, sigma_v)
+        X ~ N(UV, sigma_x)
+
+        Parameters
+        -----------
+        n_components: Embedding dimension
+        mu_u: mean of elements in U
+        sigma_u: std of elements in U
+        mu_v: mean of elements in
+        sigma_v: std of elements in V
+        sigma_x: std of elements in X
+        stanfile: file with stancode
+        cache_name: name for compiled model
+        '''
+        super().__init__()
+        self.stanfile = stanfile
+        self.cache_name = cache_name
+
+        self.n_components = n_components
+
+        self.mu_u = mu_u
+        self.sigma_u = sigma_u
+
+        self.mu_v = mu_v
+        self.sigma_v = sigma_v
+
+        self.sigma_x = sigma_x
+        self.stan_kwargs = stan_kwargs
+
+    def _likelihood_sample(self, P, picks):
+        self.assert_fitted()
+        return np.random.normal(loc=P, scale=self.sigma_x, size=P.shape)
+
+    def fit_transform(self, df: pd.DataFrame):
+        '''
+        Parameters
+        -----------
+        df: should represent matrix in sparse format, each row should
+            consists only of [row_index, col_index, value] in that order
+
+        kwargs: keyword arguments for StanModel.sampling()
+
+        Returns
+        --------
+        Sampled values
+        (Us, Vs)
+        '''
+        # Get shape (p, q) of dense matrix
+        self.p = len(df.iloc[:,0].unique())
+        self.q = len(df.iloc[:,1].unique())
+
+        datadict = dict(
+            n_components=self.n_components, n=len(df), p=self.p,
+            q=self.q, df=df, mu_u=self.mu_u, sigma_u=self.sigma_u,
+            mu_v=self.mu_v, sigma_v=self.sigma_v, sigma_x=self.sigma_x
+        )
+
+        self.code = utils.get_stan_code(self.stanfile)
+        self.sm = utils.StanModel_cache(self.code, model_name=self.cache_name)
+
+        self.stanfit = self.sm.sampling(datadict, **self.stan_kwargs)
+        self.Us, self.Vs, self.lp__ =\
+            self.stanfit['U'], self.stanfit['V'], self.stanfit['lp__']
+
+        # Set fitted flag
+        self.set_fitted()
+
+        return self.Us, self.Vs
+
 
 class NonNegativeFactorizer(BaseStanFactorizer):
     '''
