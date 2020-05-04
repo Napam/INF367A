@@ -14,11 +14,62 @@ import pystan
 import pickle
 from hashlib import md5
 from typing import Union, Iterable
+from sklearn.model_selection import ParameterGrid
+from multiprocessing import Pool
+from tqdm import tqdm
+from time import time
 
-def histmax(chain: np.ndarray, bins: Union[str, int]='auto'):
-    hist, edges = np.histogram(chain, bins=bins)
-    hat = edges[hist.argmax()+1]
-    return hat
+def fit_and_evaluate(args: tuple):
+    model, init_kwargs, X_train, X_val = args
+    
+    model_object = model(**init_kwargs)
+ 
+    t0 = time()
+    model_object.fit(X_train)
+    fit_time = time()-t0
+    
+    train_mae = model_object.mae(X_train)
+    
+    if X_val is not None:
+        val_mae = model_object.mae(X_val)   
+    else:
+        val_mae = None
+        
+    return model_object, fit_time, train_mae, val_mae
+
+def fit_and_evaluate_models(models: Iterable, X_train, X_val=None, candidate_kwargs: dict={},
+                            static_kwargs: dict={}, verbose=True):
+        
+    hist = {'model':[], 'params':[], 'fit_time':[], 'train_mae':[], 'val_mae':[]}
+    
+    map_args = []
+    param_gen = ParameterGrid({'model':models, **candidate_kwargs})
+    n_params = len(param_gen)
+    for paramdict in param_gen:
+        model = paramdict.pop('model')
+        
+        hist['params'].append(paramdict)
+        
+        paramdict = paramdict.copy()
+        paramdict.update(static_kwargs)
+        
+        map_args.append((model, paramdict, X_train, X_val))
+    
+    with Pool(None) as p:
+        fit_iterator = tqdm(
+            p.imap_unordered(fit_and_evaluate, map_args), total=n_params,
+            desc='Fitting models', disable=not verbose, unit='model', position=0
+        )
+        results = list(fit_iterator)
+        
+    for result in results:
+        model_object, fit_time, train_mae, val_mae = result
+        hist['model'].append(model_object)
+        hist['fit_time'].append(fit_time)
+        hist['train_mae'].append(train_mae)
+        hist['val_mae'].append(val_mae)
+    
+    return hist
 
 def get_stan_code(filename: str):
     with open(filename, 'r') as f:

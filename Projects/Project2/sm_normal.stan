@@ -25,8 +25,8 @@ data {
     real<lower=0> sigma_v; // Prior std of elemens in V matrix
 
     // Values for beta \sim Gamma(a,b)
-    real<lower=0> a; 
-    real<lower=0> b; 
+    real<lower=0> a_beta;
+    real<lower=0> b_beta;
 }
 
 transformed data {
@@ -43,6 +43,7 @@ transformed data {
 parameters {
     matrix[p, n_components] U;
     matrix[n_components, q] V;
+    real<lower=0> beta;
 }
 
 model {
@@ -65,6 +66,6 @@ model {
         col_idx = R[2];
         rating = R[3];
 
-        rating ~ normal(X_hat[row_idx, col_idx], sigma_x);
+        rating ~ normal(X_hat[row_idx, col_idx], beta);
     }
 }

@@ -28,7 +28,7 @@ data {
 
     // Prior parameters for beta ~ gamma(a_beta, b_beta)
     real<lower=0> a_beta; 
-    real<lower=0> b_beta; 
+    real<lower=0> b_beta;
 }
 
 transformed data {
