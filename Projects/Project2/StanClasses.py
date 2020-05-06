@@ -35,6 +35,15 @@ class BaseStanFactorizer:
         Function used for predictive sampling
         '''
 
+    @abstractmethod
+    def get_dense_shape(self, df: pd.DataFrame):
+        '''
+        df should have first column representing row index
+        and second column representing column index.
+        '''
+        # Plus 1 because first index should be 0
+        return df.iloc[:,0].max()+1, df.iloc[:,1].max()+1
+
     def assert_fitted(self):
         assert self.fitted, 'Model not fitted'
 
@@ -195,8 +204,7 @@ class SimpleFactorizer(BaseStanFactorizer):
         (Us, Vs)
         '''
         # Get shape (p, q) of dense matrix
-        self.p = len(df.iloc[:,0].unique())
-        self.q = len(df.iloc[:,1].unique())
+        self.p, self.q = self.get_dense_shape(df)
 
         datadict = dict(
             n_components=self.n_components, n=len(df), p=self.p,
@@ -220,8 +228,8 @@ class NormalFactorizer(BaseStanFactorizer):
     '''
     Class for probabilistic matrix factorization using Stan.
     '''
-    def __init__(self, n_components: int=2, mu_u: float=1, sigma_u: float=5,
-                 mu_v: float=1, sigma_v=5, a_beta: float=2, b_beta=6,
+    def __init__(self, n_components: int=2, mu_u: float=0, sigma_u: float=5,
+                 mu_v: float=0, sigma_v=5, a_beta: float=1, b_beta: float=1,
                  stanfile: str='sm_normal.stan', cache_name: str='normal', 
                  **stan_kwargs):
         '''
@@ -280,8 +288,7 @@ class NormalFactorizer(BaseStanFactorizer):
         (Us, Vs)
         '''
         # Get shape (p, q) of dense matrix
-        self.p = len(df.iloc[:,0].unique())
-        self.q = len(df.iloc[:,1].unique())
+        self.p, self.q = self.get_dense_shape(df)
 
         datadict = dict(
             n_components=self.n_components, n=len(df), p=self.p,
@@ -302,13 +309,12 @@ class NormalFactorizer(BaseStanFactorizer):
 
         return self.Us, self.Vs
 
-
 class NonNegativeFactorizer(BaseStanFactorizer):
     '''
     Class for probabilistic non negative matrix factorization using Stan.
     '''
     def __init__(self, n_components: int=2, a_u: float=2, b_u: float=1,
-                 a_v: float=2, b_v: float=1, a_beta: float=2, b_beta: float=8,
+                 a_v: float=2, b_v: float=1, a_beta: float=1, b_beta: float=1,
                  stanfile: str='sm_nmf.stan', cache_name: str='nmf', 
                  **stan_kwargs):
         '''
@@ -367,8 +373,7 @@ class NonNegativeFactorizer(BaseStanFactorizer):
         (Us, Vs)
         '''
         # Get shape (p, q) of dense matrix
-        self.p = len(df.iloc[:,0].unique())
-        self.q = len(df.iloc[:,1].unique())
+        self.p, self.q = self.get_dense_shape(df)
 
         datadict = dict(
             n_components=self.n_components, n=len(df), p=self.p,
@@ -393,8 +398,8 @@ class ARD_Factorizer(BaseStanFactorizer):
     Class for probabilistic ARD matrix factorization using Stan.
     '''
     def __init__(self, n_components: int=2, mu_u: float=0, mu_v: float=0,
-                 a_alpha: float=1, b_alpha: float=0.08, a_beta: float=2, 
-                 b_beta: float=8, stanfile: str='sm_ard.stan',
+                 a_alpha: float=1, b_alpha: float=0.08, a_beta: float=1, 
+                 b_beta: float=1, stanfile: str='sm_ard.stan',
                  cache_name: str='ard', **stan_kwargs):
         '''
         Factorization: X \approx UV, where X is the dense matrix
@@ -452,8 +457,7 @@ class ARD_Factorizer(BaseStanFactorizer):
         (Us, Vs)
         '''
         # Get shape (p, q) of dense matrix
-        self.p = len(df.iloc[:,0].unique())
-        self.q = len(df.iloc[:,1].unique())
+        self.p, self.q = self.get_dense_shape(df)
 
         datadict = dict(
             n_components=self.n_components, n=len(df), p=self.p,

@@ -42,8 +42,8 @@ transformed data {
 }
 
 parameters {
-    matrix<lower=0>[p, n_components] U;
-    matrix<lower=0>[q, n_components] VT;
+    matrix[p, n_components] U;
+    matrix[q, n_components] VT;
     vector<lower=0>[n_components] alpha;
     real<lower=0> beta;
 }

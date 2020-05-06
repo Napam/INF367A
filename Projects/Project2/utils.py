@@ -38,7 +38,7 @@ def fit_and_evaluate(args: tuple):
     return model_object, fit_time, train_mae, val_mae
 
 def fit_and_evaluate_models(models: Iterable, X_train, X_val=None, candidate_kwargs: dict={},
-                            static_kwargs: dict={}, verbose=True):
+                            static_kwargs: dict={}, verbose=True, ascii=False):
         
     hist = {'model':[], 'params':[], 'fit_time':[], 'train_mae':[], 'val_mae':[]}
     
@@ -58,7 +58,8 @@ def fit_and_evaluate_models(models: Iterable, X_train, X_val=None, candidate_kwa
     with Pool(None) as p:
         fit_iterator = tqdm(
             p.imap_unordered(fit_and_evaluate, map_args), total=n_params,
-            desc='Fitting models', disable=not verbose, unit='model', position=0
+            desc='Fitting models', disable=not verbose, unit='model', position=0,
+            ascii=ascii
         )
         results = list(fit_iterator)
         
