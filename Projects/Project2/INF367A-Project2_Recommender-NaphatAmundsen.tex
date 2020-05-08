@@ -72,11 +72,61 @@
 \newcommand{\opGamma}{\operatorname{Gamma}}
 
 \section*{Introduction}
-    This project is about creating a bayesian recommender engine specifically for movie ratings. There are different types of recommender systems. For this project, we will focus on \textit{collaborative filtering} where we try to predict user preferences based on preferences 
-    We are given the MovieLens 100K dataset, which essentially consists of movies, users and the users ratings for some movies. 
+    This project is about creating a bayesian recommender engine specifically for movie ratings. There are different types of recommender systems. For this project, we will focus on \textit{collaborative filtering} where we try to predict user preferences based on preferences. We are given the MovieLens 100K dataset, which essentially consists of movies, users and the users ratings for the movies. The dataset contains $100 000$ ratings from $943$ users on $1682$ movies. The data is sparse, because not every user has rated every movie. The task is to predict the users ratings on movies that they have not seen. 
 
-    % \bibliographystyle{apalike}
-    \bibliographystyle{ieeetran}
-    \bibliography{citations}
+    The recommender system is based on Bayesian matrix factorization, that is, we want to predict ratings as well as estimating the uncertainty in the predictions. We try using three different models to estimate the matrix factors.
 
-    \end{document}
+\section{The models}
+    The user-rating pairs can be represented with the matrix $\underset{n \times m}{X}$, where each row represents a user, and each column represents as movie. To predict the users' rating on unreviewed movies, we try to factorize matrix into two matrices $\underset{n \times k}{U}, \underset{k \times m}{V}$ such that $UV \approx X$, where $k$ denotes the number of the latent dimensions of the factors. The matrices $U,V$ will be approximated using using Hamitonian Monte Carlo implemented in Stan \cite{HMC}.
+    
+    \subsection{Normal model}
+    This model is inspired from the "regular" way of doing Bayesian linear regression, that is the elements of $U$ and $V$ are normally distributed. To give more flexibility to the user, the normal distributions for $U$ and $V$ each has different sets of user specified parameters, that is the means and standard deviations. The data points is then assumed to be normally distributed, where the mean is what $UV$ is at the corresponding element, and the standard deviation assumed to be distributed by a gamma distribution with user specified values for shape and scale.
+
+    \begin{align*}
+        U_{ij} \sim N(\mu_u, \sigma_u) \\
+        V_{ij} \sim N(\mu_v, \sigma_v) \\
+        X_{ij}\sim N((UV)_{ij}, \beta) \\
+        \beta \sim Gamma(a_\beta, b_\beta) 
+    \end{align*}
+
+    User defined parameters: $\mu_u, \sigma_u, \mu_v, \sigma_v, a_\beta, b_\beta$.
+    
+    \subsection{Non-negative factorization model}
+    The idea here is to constrain $U$ and $V$ to consist only of positive numbers, as the ratings are only positive after all. This model is very much like the normal model mentioned above, but the elements of $U$ and $V$ are gamma distributed instead.
+
+    \begin{align*}
+        U_{ij}\sim Gamma(a_u, b_u) \\
+        V_{ij}\sim Gamma(a_v, b_v) \\
+        X_{ij}\sim Normal((UV)_{ij}, \beta) \\
+        \beta \sim Gamma(a_\beta, b_\beta) 
+    \end{align*}
+
+    User defined variables: $a_u, b_u, a_v, b_v, a_\beta, b_\beta$.
+    
+    \subsection{ARD model}
+    This model is inspired by the ARD (Automatic Relevance Determination) model used for regression tasks. This model can be viewed as an extension of the aforementioned "Normal model". The matrices $U$ and $V$ are still assumed to be distributed with gaussians. However, the difference is that each column (essentially components) of $U$ and $V^T$ has their own standard deviations. The standard deviations are assumed to be distributed from a gamma distribution with user specified parameters. We denote the standard deviations for the columns with the array $\alpha$ of size $k$, where each element correspond to each column of $U$ and $V^T$.
+
+    \begin{align*}
+        \beta \sim Gamma(a_\beta, b_\beta) \\
+        \alpha_{j} \sim Gamma(a_\alpha, b_\alpha) \\
+        U_{ij} \sim N(\mu_U, \alpha_j) \\
+        V^T_{ij} \sim N(\mu_V, \alpha_j) \\
+        X_{ij}\sim N((UV)_{ij}, \beta) \\
+    \end{align*}
+
+    User defined variables: $\mu_U, \mu_V, a_\alpha, b_\alpha, a_\beta, b_\beta$.
+
+\section{Model selection}
+We do model selection to find the best performing model on the dataset. 
+
+    \subsection{Data subsampling}
+    To speed up the model selection process we do model selection on a subset of the data. We subsample 250 users and 250 movies. The matrix is sparse, so we want to subsample the data such that we get the "dense parts" of the matrix. To do this we pick the top 250 users based on number of movies rated, then we pick the top 250 movies with the most ratings from said users. This produces a $250 \times 250$ matrix with about $50\%$ observed elements.
+
+    \subsection{Model selection results}
+    
+
+% \bibliographystyle{apalike}
+\bibliographystyle{ieeetr}
+\bibliography{citations}
+
+\end{document}

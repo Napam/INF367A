@@ -35,8 +35,8 @@ class BaseStanFactorizer:
         Function used for predictive sampling
         '''
 
-    @abstractmethod
-    def get_dense_shape(self, df: pd.DataFrame):
+    @staticmethod
+    def get_dense_shape(df: pd.DataFrame):
         '''
         df should have first column representing row index
         and second column representing column index.
@@ -92,6 +92,7 @@ class BaseStanFactorizer:
         ------------
         n_elements: Number of elements to calculte credible intervals for, 
                     no effect if col_inds and row_inds are given.
+
         row_inds: Optional, which row indices in X to show CIs for
 
         col_inds: Optional, which column indices in X to show CIs for
@@ -476,6 +477,7 @@ class ARD_Factorizer(BaseStanFactorizer):
         self.betas = self.stanfit['beta']
         self.lp__ = self.stanfit['lp__']
 
+        # Scale the columns with the alpha values
         self.Us = self.Us_raw*self.alphas[:,np.newaxis,:]
         self.Vs = (self.Vs_raw*self.alphas[:,np.newaxis,:]).transpose([0,2,1])
 

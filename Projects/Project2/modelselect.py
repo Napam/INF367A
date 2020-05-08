@@ -51,7 +51,7 @@ print(f'''Dataframe dimensions:
 
     df_train: {df_train.shape}
     df_val: {df_val.shape}
-    df_test: {df_test.shape}''')
+    ''')
 
 models = [
     StanClasses.NormalFactorizer,

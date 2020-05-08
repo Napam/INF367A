@@ -107,28 +107,25 @@ txt = re.sub('(\n{2,})', '\n', txt)
 # print(B)
 # print('\n')
 
-A = np.ones((3,3,2))
+A = np.ones((4,3,2))
 B = np.array([
     [0,0],
     [1,1],
     [2,2],
+    [3,3],
 ])
 
 print(A)
+print()
 print(B)
 print()
-print(A*B[:,np.newaxis,:])
-print()
-print(A.shape)
-print(B[:,np.newaxis,:].shape)
+print(np.einsum('ijk,jk->jik',A,B))
 
-shared_fit_kwargs = {
-    'chains':1, 
-    'n_jobs':1, 
-    'iter':1000, 
-    'thin':5, 
-    'control':{'max_treedepth':20}
-}
+A = np.ones((3,2))
+B = np.array([1,3])
 
-
-
+# print(A)
+# print()
+# print(B)
+# print()
+np.einsum('ij,j->ij',A,B)
