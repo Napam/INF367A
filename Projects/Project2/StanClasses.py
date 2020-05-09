@@ -316,7 +316,7 @@ class NonNegativeFactorizer(BaseStanFactorizer):
     '''
     def __init__(self, n_components: int=2, a_u: float=2, b_u: float=1,
                  a_v: float=2, b_v: float=1, a_beta: float=1, b_beta: float=1,
-                 stanfile: str='sm_nmf.stan', cache_name: str='nmf', 
+                 stanfile: str='sm_nmf.stan', cache_name: str='nmf',
                  **stan_kwargs):
         '''
         Factorization: X \approx UV, where X is the dense matrix

@@ -60,7 +60,7 @@ models = [
 ]
 
 init_kwargs = {'n_components':[1,2,3,4,5]}
-static_kwargs = {'chains':1, 'iter':1200, 'control':{'max_treedepth':15}}
+static_kwargs = {'chains':1, 'iter':2000, 'control':{'max_treedepth':15}}
 
 t0 = time()
 hist = utils.fit_and_evaluate_models(
@@ -76,7 +76,7 @@ print('evaltime: ', evaltime)
 
 df_hist = pd.DataFrame(hist)
 df_hist.sort_values('val_mae', inplace=True)
-df_hist.to_pickle('histpickle_withmodels4.pkl')
+df_hist.to_pickle('histpickle_withmodels5.pkl')
 
 best_model = df_hist['model'].values[0]
 best_params = df_hist['params'].values[0].copy()
@@ -102,5 +102,5 @@ hist2 = {
     'val_mae':val_mae
 }
 
-with open('final_dict4.pkl', 'wb') as f:
+with open('final_dict5.pkl', 'wb') as f:
     pickle.dump(hist2, f)

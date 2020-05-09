@@ -70,6 +70,8 @@
 \fi
 
 \newcommand{\opGamma}{\operatorname{Gamma}}
+\newcommand{\Um}{\underset{n \times k}{U}}
+\newcommand{\Vm}{\underset{k \times m}{V}}
 
 \section*{Introduction}
     This project is about creating a bayesian recommender engine specifically for movie ratings. There are different types of recommender systems. For this project, we will focus on \textit{collaborative filtering} where we try to predict user preferences based on preferences. We are given the MovieLens 100K dataset, which essentially consists of movies, users and the users ratings for the movies. The dataset contains $100 000$ ratings from $943$ users on $1682$ movies. The data is sparse, because not every user has rated every movie. The task is to predict the users ratings on movies that they have not seen. 
@@ -78,78 +80,160 @@
 
 \section{The models}
     The user-rating pairs can be represented with the matrix $\underset{n \times m}{X}$, where each row represents a user, and each column represents as movie. To predict the users' rating on unreviewed movies, we try to factorize matrix into two matrices $\underset{n \times k}{U}, \underset{k \times m}{V}$ such that $UV \approx X$, where $k$ denotes the number of the latent dimensions of the factors. The matrices $U,V$ will be approximated using using Hamitonian Monte Carlo implemented in Stan \cite{HMC}.
+
+    \subsection*{Data standard deviation}
+        All the models share the same distribution for the data, that is $X_{ij}\sim N((UV)_{ij}, \beta)$. The prior for $\beta$ is chosen to be a gamma distribution with scale$=1$, and shape$=1$, which seems reasonable as we expect the data points to be close to whatever $UV$ estimates. Note that this is effectively an exponential distribution with rate $1$.
+    
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.5\textwidth]{betaprior.pdf}
+            \caption{Probability density function for $\beta$, the assumed standard deviation of the data from the estimated values from $UV$.}
+        \end{figure}
     
     \subsection{Normal model}
     This model is inspired from the "regular" way of doing Bayesian linear regression, that is the elements of $U$ and $V$ are normally distributed. To give more flexibility to the user, the normal distributions for $U$ and $V$ each has different sets of user specified parameters, that is the means and standard deviations. The data points is then assumed to be normally distributed, where the mean is what $UV$ is at the corresponding element, and the standard deviation assumed to be distributed by a gamma distribution with user specified values for shape and scale.
-
     \begin{align*}
-        U_{ij} \sim N(\mu_u, \sigma_u) \\
-        V_{ij} \sim N(\mu_v, \sigma_v) \\
-        X_{ij}\sim N((UV)_{ij}, \beta) \\
-        \beta \sim Gamma(a_\beta, b_\beta) 
+        U_{ij}  &\sim N(\mu_U, \sigma_U) \\
+        V_{ij}  &\sim N(\mu_V, \sigma_V) \\
+        \beta  &\sim \opGamma(a_\beta, b_\beta) \\
+        X_{ij} &\sim N((UV)_{ij}, \beta) 
     \end{align*}
 
-    User defined parameters: $\mu_u, \sigma_u, \mu_v, \sigma_v, a_\beta, b_\beta$.
+    User defined parameters: $\mu_U, \sigma_U, \mu_V, \sigma_V, a_\beta, b_\beta$.
     
+    \vspace{3mm}
+    We set the the means for the elemenets in $U$ and $V$ to be $0$, and set the standard deviations to be $5$, just to cover the range of the ratings within on standard deviation. That is: $\mu_U=0,\ \sigma_U=5,\ \mu_V=0,\ \sigma_V=5,\ a_\beta=1,\ b_\beta=1$.
+
     \subsection{Non-negative factorization model}
     The idea here is to constrain $U$ and $V$ to consist only of positive numbers, as the ratings are only positive after all. This model is very much like the normal model mentioned above, but the elements of $U$ and $V$ are gamma distributed instead.
-
     \begin{align*}
-        U_{ij}\sim Gamma(a_u, b_u) \\
-        V_{ij}\sim Gamma(a_v, b_v) \\
-        X_{ij}\sim Normal((UV)_{ij}, \beta) \\
-        \beta \sim Gamma(a_\beta, b_\beta) 
+        U_{ij} &\sim \opGamma(a_U, b_U) \\
+        V_{ij} &\sim \opGamma(a_V, b_V) \\
+        \beta  &\sim \opGamma(a_\beta, b_\beta) \\
+        X_{ij} &\sim Normal((UV)_{ij}, \beta) 
     \end{align*}
 
-    User defined variables: $a_u, b_u, a_v, b_v, a_\beta, b_\beta$.
+    User defined variables: $a_U, b_U, a_V, b_V, a_\beta, b_\beta$.
     
+    \vspace{3mm}
+    We specify the scale and shape such that the density "huddles" around $1$, as matrix multiplication will involve a lot of multiplications and additions when reconstructing $X$. We find it reasonable to expect values to not be very large. Specifically, the scale is $2$ and shape is $1$.
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.5\textwidth]{nmfprior.pdf}
+        \caption{Probability density function for the elements in $U$ and $V$.}
+    \end{figure}
+    To summarize: $a_U=2,\ b_U=1,\ a_V=2,\ b_V=1,\ a_\beta=1,\ b_\beta=1$.
+
     \subsection{ARD model}
     This model is inspired by the ARD (Automatic Relevance Determination) model used for regression tasks. This model can be viewed as an extension of the aforementioned "Normal model". The matrices $U$ and $V$ are still assumed to be distributed with gaussians. However, the difference is that each column (essentially components) of $U$ and $V^T$ has their own standard deviations. The standard deviations are assumed to be distributed from a gamma distribution with user specified parameters. We denote the standard deviations for the columns with the array $\alpha$ of size $k$, where each element correspond to each column of $U$ and $V^T$.
-
     \begin{align*}
-        \beta \sim Gamma(a_\beta, b_\beta) \\
-        \alpha_{j} \sim Gamma(a_\alpha, b_\alpha) \\
-        U_{ij} \sim N(\mu_U, \alpha_j) \\
-        V^T_{ij} \sim N(\mu_V, \alpha_j) \\
-        X_{ij}\sim N((UV)_{ij}, \beta) \\
+        \alpha_{j}  &\sim \opGamma(a_\alpha, b_\alpha) \\
+        U_{ij}  &\sim N(\mu_U, \alpha_j) \\
+        V^T_{ij}  &\sim N(\mu_V, \alpha_j) \\
+        \beta  &\sim \opGamma(a_\beta, b_\beta) \\
+        X_{ij} &\sim N((UV)_{ij}, \beta)
     \end{align*}
 
     User defined variables: $\mu_U, \mu_V, a_\alpha, b_\alpha, a_\beta, b_\beta$.
+    
+    \vspace{3mm}
+    We specify the same parameters as the Normal model for the ARD model where we can, that is the means and standard deviations for $U$ and $V$. We are unsure how the $\alpha$ values for the ARD should take, so we pick parameters for the prior distribution that does such that it does not assume much. 
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.5\textwidth]{alphaprior.pdf}
+        \caption{Probability density for $\alpha$ values. Again, this is effectively equivalent to an expononential distribution. Note that the rate is quite slow (compared to the one used for $\beta$ for example).}
+    \end{figure}
+    To summarize the parameters for the ARD priors: $\mu_U=0,\ \sigma_U=5,\ \mu_V=0,\ \sigma_V=5,\ a_\alpha=1,\ b_\alpha=0.08, \ a_\beta=1,\ b_\beta=1$.
 
 \section{Model selection}
 We do model selection to find the best performing model on the dataset. There are many hyperparameters that can be tuned such as the scale and shape of gamma distributions for the $\beta$-value for the models. However, as the training time takes quite a while for each model, we limit the hyperparameter search to finding a good value for $k$, that is the latent dimension of the matrix factors $\underset{n \times k}{U}, \underset{k \times m}{V}$. 
 
-    \subsection{Data subsampling}
-    To speed up the model selection process we do model selection on a subset of the data. We subsample 250 users and 250 movies. The matrix is sparse, so we want to subsample the data such that we get the "dense parts" of the matrix. To do this we pick the top 250 users based on number of movies rated, then we pick the top 250 movies with the most ratings from said users. This produces a $250 \times 250$ matrix with about $50\%$ observed elements. From the subset we create a train ($90\%$ of the subset) and a hold out set(the remaining $10\%$). The train set will be used for training, while the hold out set will be used for validation.
+After determining the best candidate on model the model selection, said candidate will be trained on $90\%$ of all the data, and then validated on the remaining $10\%$.
 
-    \subsection{Prior distributions}
+    \subsection{Data subsampling}
+    To speed up the model selection process we do model selection on a subset of the data. We subsample 250 users and 250 movies. The matrix is sparse, so we want to subsample the data such that we get the "dense parts" of the matrix. To do this we pick the top 250 users based on number of movies rated, then we pick the top 250 movies with the most ratings from said users. This produces a $250 \times 250$ matrix with about $50\%$ observed elements. From the subset we create a train ($90\%$ of the subset) and a hold out set (the remaining $10\%$). The train set will be used for training, while the hold out set will be used for validation.
 
     \subsection{Model selection results}
+    From undocumented trial and error we found out that the appropriate number of latent dimensions is probably between $1$ and $5$, so we train and validate all the models with $1$ to $5$ latent dimensions. We do XXXX iterations using Stan's HMC sampler, and set the "max\_treedepth" control argument to $15$ (the warnings from Stan told us to do it) when sampling.
     \begin{table}[H]
         \centering
-        \caption{k is the latent dimension, fit\_time shows training time in seconds, train\_mae is the mean absolute error on the training set, while val\_mae is the mean absolute error on the validation set.}
-        \begin{tabular}{llrrr}
+        \caption{k is the latent dimension, train time shows training time in seconds, train MAE is the mean absolute error on the training set, while val MAE is the mean absolute error on the validation set.}
+        \begin{tabular}{llrr|rr}
             \toprule
-                             model &   k &   fit\_time &  train\_mae &  val\_mae \\
+            {} &         model &  k &  train time (seconds) &  train MAE &  val MAE \\
             \midrule
-                    ARD\_Factorizer &  10 &  5140.2271 &     0.6509 &   0.6825 \\
-                  NormalFactorizer &   5 &  1559.3734 &     0.6489 &   0.6826 \\
-             NonNegativeFactorizer &   3 &  1523.8056 &     0.6500 &   0.6830 \\
-                    ARD\_Factorizer &  20 &  6256.7602 &     0.6326 &   0.6874 \\
-             NonNegativeFactorizer &  15 &  2177.1438 &     0.6321 &   0.6939 \\
-                  NormalFactorizer &   5 &  4159.6307 &     0.6285 &   0.6995 \\
-                    ARD\_Factorizer &  15 &  5380.6819 &     0.5989 &   0.7070 \\
-             NonNegativeFactorizer &  10 &  1982.6133 &     0.6055 &   0.7115 \\
-             NonNegativeFactorizer &  20 &  2594.4184 &     0.5926 &   0.7239 \\
-                    ARD\_Factorizer &   3 &  6514.1666 &     0.5761 &   0.7260 \\
-             NonNegativeFactorizer &   3 &  3129.1756 &     0.5919 &   0.7283 \\
-                    ARD\_Factorizer &   5 &  7254.7662 &     0.5585 &   0.7400 \\
-                  NormalFactorizer &  10 & 15866.0379 &     0.5859 &   0.7496 \\
-                  NormalFactorizer &  15 & 35323.2319 &     0.5505 &   0.8026 \\
-                  NormalFactorizer &  20 & 35803.3160 &     0.5167 &   0.8551 \\
+            1  &           ARD &  3 &             4748.8171 &     0.6510 &   0.6822 \\
+            2  &  Non-negative &  3 &             2111.0567 &     0.6499 &   0.6827 \\
+            3  &        Normal &  3 &             3204.8550 &     0.6488 &   0.6827 \\
+            4  &           ARD &  4 &             5602.4438 &     0.6415 &   0.6832 \\
+            5  &  Non-negative &  2 &             2071.6710 &     0.6630 &   0.6843 \\
+            6  &           ARD &  2 &             4142.7847 &     0.6635 &   0.6845 \\
+            7  &        Normal &  2 &             1749.6510 &     0.6628 &   0.6850 \\
+            8  &  Non-negative &  4 &             2727.4210 &     0.6406 &   0.6860 \\
+            9  &           ARD &  5 &             5765.4504 &     0.6327 &   0.6876 \\
+            10 &        Normal &  4 &             3805.0494 &     0.6384 &   0.6900 \\
+            11 &  Non-negative &  5 &             2528.1382 &     0.6321 &   0.6938 \\
+            12 &        Normal &  5 &             5514.9162 &     0.6283 &   0.6997 \\
+            13 &        Normal &  1 &             1099.4541 &     0.6991 &   0.7083 \\
+            14 &  Non-negative &  1 &             1589.8258 &     0.6992 &   0.7084 \\
+            15 &           ARD &  1 &             2599.5240 &     0.6992 &   0.7084 \\
             \bottomrule
         \end{tabular}
     \end{table}
+    
+    \begin{table}[H]
+        \centering
+        \caption{This table shows the min, max, mean and standard deviation of the \textbf{Rhat} values from the sampling.}
+        \begin{tabular}{llr|rr|rr}
+            \toprule
+            {} &         model &  k &  Rhat min &  Rhat max &  Rhat mean &  Rhat std \\
+            \midrule
+            1  &           ARD &  3 &    0.9990 &    1.3138 &     1.0411 &    0.0887 \\
+            2  &  Non-negative &  3 &    0.9990 &    1.0338 &     1.0032 &    0.0055 \\
+            3  &        Normal &  3 &    0.9990 &    2.1189 &     1.2102 &    0.2135 \\
+            4  &           ARD &  4 &    0.9990 &    1.3835 &     1.0594 &    0.0971 \\
+            5  &  Non-negative &  2 &    0.9990 &    1.0250 &     1.0026 &    0.0044 \\
+            6  &           ARD &  2 &    0.9990 &    1.2645 &     1.0478 &    0.0788 \\
+            7  &        Normal &  2 &    0.9990 &    1.3543 &     1.0640 &    0.0827 \\
+            8  &  Non-negative &  4 &    0.9990 &    1.0730 &     1.0052 &    0.0092 \\
+            9  &           ARD &  5 &    0.9990 &    2.2013 &     1.1479 &    0.2843 \\
+            10 &        Normal &  4 &    0.9990 &    2.4649 &     1.3759 &    0.3153 \\
+            11 &  Non-negative &  5 &    0.9990 &    1.1202 &     1.0072 &    0.0126 \\
+            12 &        Normal &  5 &    0.9990 &    1.9551 &     1.2106 &    0.2251 \\
+            13 &        Normal &  1 &    0.9994 &    1.1562 &     1.0909 &    0.0238 \\
+            14 &  Non-negative &  1 &    0.9991 &    1.2715 &     1.1814 &    0.0382 \\
+            15 &           ARD &  1 &    1.0024 &    1.5671 &     1.2801 &    0.1115 \\
+            \bottomrule
+            \end{tabular}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering
+        \caption{This table shows the min, max, mean and standar deviation of the \textbf{N\_eff} (number of effective samples) values from the sampling.}
+        \begin{tabular}{llr|rr|rr}
+            \toprule
+            {} &         model &  k &  Neff min &  Neff max &  Neff mean &  Neff std \\
+            \midrule
+            1  &           ARD &  3 &    4.8574 & 1127.6726 &   275.7620 &  231.6963 \\
+            2  &  Non-negative &  3 &   40.4421 & 1677.8139 &   318.3954 &  223.1981 \\
+            3  &        Normal &  3 &    3.4360 & 1020.3357 &    10.5009 &   28.1623 \\
+            4  &           ARD &  4 &    4.8997 & 1571.0058 &   220.2744 &  272.0015 \\
+            5  &  Non-negative &  2 &   33.8124 & 1403.8710 &   234.1758 &  191.7673 \\
+            6  &           ARD &  2 &    5.5987 & 1657.3678 &   297.9770 &  320.3376 \\
+            7  &        Normal &  2 &    3.9082 & 1127.2144 &    10.0871 &   37.3944 \\
+            8  &  Non-negative &  4 &   16.0936 & 1799.1824 &   187.5072 &  157.2839 \\
+            9  &           ARD &  5 &    2.9357 & 1231.9205 &   136.8569 &  228.5099 \\
+            10 &        Normal &  4 &    2.7750 & 1068.2205 &     8.1337 &   25.1019 \\
+            11 &  Non-negative &  5 &   35.9622 & 1523.1771 &   268.6275 &  162.7551 \\
+            12 &        Normal &  5 &    3.3734 &  894.0220 &    10.0690 &   20.1732 \\
+            13 &        Normal &  1 &   10.4850 & 1007.2907 &    21.6554 &   47.9306 \\
+            14 &  Non-negative &  1 &    5.2699 &  771.6474 &    10.6626 &   38.0074 \\
+            15 &           ARD &  1 &    4.3445 &  586.1205 &     8.2810 &   25.9324 \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+
+    The model selection process shows that the ARD model with $k=3$ is the best performer on the validation set. A quick analysis of the number of effective samples and Rhat values suggests that not all elements in the matrix factors converged. Nevertheless, the ARD model that is still chosen as to be the "best" candidate, based on the simple reasoning that it did manage to score the best on the validation set.
 
 % \bibliographystyle{apalike}
 \bibliographystyle{ieeetr}
