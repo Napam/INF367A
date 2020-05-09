@@ -59,8 +59,8 @@ models = [
     StanClasses.ARD_Factorizer
 ]
 
-init_kwargs = {'n_components':[3,5,10,15,20]}
-static_kwargs = {'chains':1, 'iter':1000, 'control':{'max_treedepth':15}}
+init_kwargs = {'n_components':[1,2,3,4,5]}
+static_kwargs = {'chains':1, 'iter':1200, 'control':{'max_treedepth':15}}
 
 t0 = time()
 hist = utils.fit_and_evaluate_models(
@@ -76,12 +76,11 @@ print('evaltime: ', evaltime)
 
 df_hist = pd.DataFrame(hist)
 df_hist.sort_values('val_mae', inplace=True)
-df_hist.to_pickle('histpickle_withmodels3.pkl')
+df_hist.to_pickle('histpickle_withmodels4.pkl')
 
 best_model = df_hist['model'].values[0]
 best_params = df_hist['params'].values[0].copy()
 best_params.update(static_kwargs)
-final_model = type(best_model)(**best_params)
 
 df_full, _, _ = utils.get_ml100k_data(DATA_DIR)
 df_full[['user_id', 'item_id']] -= 1
@@ -89,18 +88,19 @@ df_full[['user_id', 'item_id']] -= 1
 # We are not going to use timestamp, therefore drop it
 df_full.drop('timestamp', axis='columns', inplace=True)
 
-df_full_train, df_test = train_test_split(df_full, test_size=0.05, random_state=seed)
+# final_dict4 uses 0.1 test_size, while previous ones use 0.05
+df_full_train, df_full_val = train_test_split(df_full, test_size=0.1, random_state=seed)
 
-final_model_object, fit_time, train_mae, test_mae =\
-    utils.fit_and_evaluate((type(best_model), best_params, df_full_train, df_test))
+final_model_object, fit_time, train_mae, val_mae =\
+    utils.fit_and_evaluate((type(best_model), best_params, df_full_train, df_full_val))
 
 hist2 = {
     'model':final_model_object,
     'params':best_params,
     'fit_time':fit_time,
     'train_mae':train_mae,
-    'test_mae':test_mae
+    'val_mae':val_mae
 }
 
-with open('final_dict.pkl', 'wb') as f:
+with open('final_dict4.pkl', 'wb') as f:
     pickle.dump(hist2, f)

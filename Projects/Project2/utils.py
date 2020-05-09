@@ -20,8 +20,13 @@ from tqdm import tqdm
 from time import time
 
 def fit_and_evaluate(args: tuple):
-    model, init_kwargs, X_train, X_val = args
-    
+    with_index = False
+    try:
+        model, init_kwargs, X_train, X_val = args
+    except ValueError:
+        index, model, init_kwargs, X_train, X_val = args
+        with_index = True
+
     model_object = model(**init_kwargs)
  
     t0 = time()
@@ -34,8 +39,11 @@ def fit_and_evaluate(args: tuple):
         val_mae = model_object.mae(X_val)   
     else:
         val_mae = None
-        
-    return model_object, fit_time, train_mae, val_mae
+    
+    if with_index:
+        return index, model_object, fit_time, train_mae, val_mae
+    else:
+        return model_object, fit_time, train_mae, val_mae
 
 def fit_and_evaluate_models(models: Iterable, X_train, X_val=None, candidate_kwargs: dict={},
                             static_kwargs: dict={}, verbose=True, ascii=False):
@@ -43,17 +51,19 @@ def fit_and_evaluate_models(models: Iterable, X_train, X_val=None, candidate_kwa
     hist = {'model':[], 'params':[], 'fit_time':[], 'train_mae':[], 'val_mae':[]}
     
     map_args = []
+    candidate_param_list = []
     param_gen = ParameterGrid({'model':models, **candidate_kwargs})
     n_params = len(param_gen)
-    for paramdict in param_gen:
+
+    for i, paramdict in enumerate(param_gen):
         model = paramdict.pop('model')
         
-        hist['params'].append(paramdict)
+        candidate_param_list.append(paramdict)
         
         paramdict = paramdict.copy()
         paramdict.update(static_kwargs)
         
-        map_args.append((model, paramdict, X_train, X_val))
+        map_args.append((i, model, paramdict, X_train, X_val))
     
     with Pool(None) as p:
         fit_iterator = tqdm(
@@ -64,8 +74,9 @@ def fit_and_evaluate_models(models: Iterable, X_train, X_val=None, candidate_kwa
         results = list(fit_iterator)
         
     for result in results:
-        model_object, fit_time, train_mae, val_mae = result
+        index, model_object, fit_time, train_mae, val_mae = result
         hist['model'].append(model_object)
+        hist['params'].append(candidate_param_list[index])
         hist['fit_time'].append(fit_time)
         hist['train_mae'].append(train_mae)
         hist['val_mae'].append(val_mae)
@@ -152,29 +163,12 @@ def get_ml100k_data(directory:str, subsample_top_users: int=None,
     return df_users, df_item_features.astype(float), df_item_metadata
 
 if __name__ == '__main__':
-    # df_users, _, _ = get_ml100k_data(directory='ml-100k')
+    df_users, _, _ = get_ml100k_data(directory='ml-100k')
 
     # Start counting at zero instead of one
-    # df_users[['user_id', 'item_id']] -= 1 
+    df_users[['user_id', 'item_id']] -= 1 
 
     # Pick out some random users to make test set 
 
-    # df_train, df_test = train_test_split(df_users, test_size=0.3)
 
-    # X_train = sparse.csc_matrix((df_train.rating, (df_train.user_id, df_train.item_id))).toarray()
-    # X_test = sparse.csc_matrix((df_test.rating, (df_test.user_id, df_test.item_id))).toarray()
-
-    # print(df_users)
-    # print(X_train)
-    # print(X_test)
-
-    A = np.random.randint(0,100, size=(10,8))
-    from sklearn.decomposition import PCA, NMF
-    P = NMF(2)
-    X = P.fit_transform(A)
-    print(A)
-    print(X.shape)
-    print(X)
-    print(P.components_.shape)
-    print(P.components_)
-    print((X@P.components_).astype(int))
+    

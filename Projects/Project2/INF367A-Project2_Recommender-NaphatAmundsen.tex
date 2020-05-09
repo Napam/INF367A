@@ -117,13 +117,39 @@
     User defined variables: $\mu_U, \mu_V, a_\alpha, b_\alpha, a_\beta, b_\beta$.
 
 \section{Model selection}
-We do model selection to find the best performing model on the dataset. 
+We do model selection to find the best performing model on the dataset. There are many hyperparameters that can be tuned such as the scale and shape of gamma distributions for the $\beta$-value for the models. However, as the training time takes quite a while for each model, we limit the hyperparameter search to finding a good value for $k$, that is the latent dimension of the matrix factors $\underset{n \times k}{U}, \underset{k \times m}{V}$. 
 
     \subsection{Data subsampling}
-    To speed up the model selection process we do model selection on a subset of the data. We subsample 250 users and 250 movies. The matrix is sparse, so we want to subsample the data such that we get the "dense parts" of the matrix. To do this we pick the top 250 users based on number of movies rated, then we pick the top 250 movies with the most ratings from said users. This produces a $250 \times 250$ matrix with about $50\%$ observed elements.
+    To speed up the model selection process we do model selection on a subset of the data. We subsample 250 users and 250 movies. The matrix is sparse, so we want to subsample the data such that we get the "dense parts" of the matrix. To do this we pick the top 250 users based on number of movies rated, then we pick the top 250 movies with the most ratings from said users. This produces a $250 \times 250$ matrix with about $50\%$ observed elements. From the subset we create a train ($90\%$ of the subset) and a hold out set(the remaining $10\%$). The train set will be used for training, while the hold out set will be used for validation.
+
+    \subsection{Prior distributions}
 
     \subsection{Model selection results}
-    
+    \begin{table}[H]
+        \centering
+        \caption{k is the latent dimension, fit\_time shows training time in seconds, train\_mae is the mean absolute error on the training set, while val\_mae is the mean absolute error on the validation set.}
+        \begin{tabular}{llrrr}
+            \toprule
+                             model &   k &   fit\_time &  train\_mae &  val\_mae \\
+            \midrule
+                    ARD\_Factorizer &  10 &  5140.2271 &     0.6509 &   0.6825 \\
+                  NormalFactorizer &   5 &  1559.3734 &     0.6489 &   0.6826 \\
+             NonNegativeFactorizer &   3 &  1523.8056 &     0.6500 &   0.6830 \\
+                    ARD\_Factorizer &  20 &  6256.7602 &     0.6326 &   0.6874 \\
+             NonNegativeFactorizer &  15 &  2177.1438 &     0.6321 &   0.6939 \\
+                  NormalFactorizer &   5 &  4159.6307 &     0.6285 &   0.6995 \\
+                    ARD\_Factorizer &  15 &  5380.6819 &     0.5989 &   0.7070 \\
+             NonNegativeFactorizer &  10 &  1982.6133 &     0.6055 &   0.7115 \\
+             NonNegativeFactorizer &  20 &  2594.4184 &     0.5926 &   0.7239 \\
+                    ARD\_Factorizer &   3 &  6514.1666 &     0.5761 &   0.7260 \\
+             NonNegativeFactorizer &   3 &  3129.1756 &     0.5919 &   0.7283 \\
+                    ARD\_Factorizer &   5 &  7254.7662 &     0.5585 &   0.7400 \\
+                  NormalFactorizer &  10 & 15866.0379 &     0.5859 &   0.7496 \\
+                  NormalFactorizer &  15 & 35323.2319 &     0.5505 &   0.8026 \\
+                  NormalFactorizer &  20 & 35803.3160 &     0.5167 &   0.8551 \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
 
 % \bibliographystyle{apalike}
 \bibliographystyle{ieeetr}
