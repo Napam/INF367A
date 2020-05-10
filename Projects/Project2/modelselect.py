@@ -88,7 +88,7 @@ df_full[['user_id', 'item_id']] -= 1
 # We are not going to use timestamp, therefore drop it
 df_full.drop('timestamp', axis='columns', inplace=True)
 
-# final_dict4 uses 0.1 test_size, while previous ones use 0.05
+# final_dict4 and later uses 0.1 test_size, while previous ones use 0.05
 df_full_train, df_full_val = train_test_split(df_full, test_size=0.1, random_state=seed)
 
 final_model_object, fit_time, train_mae, val_mae =\

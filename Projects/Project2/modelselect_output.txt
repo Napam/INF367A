@@ -546,3 +546,32 @@ Adjust your expectations accordingly!
 
 
 Iteration:    1 / 1200 [  0%]  (Warmup)
+Iteration:  120 / 1200 [ 10%]  (Warmup)
+Iteration:  240 / 1200 [ 20%]  (Warmup)
+Iteration:  360 / 1200 [ 30%]  (Warmup)
+Iteration:  480 / 1200 [ 40%]  (Warmup)
+Iteration:  600 / 1200 [ 50%]  (Warmup)
+Iteration:  601 / 1200 [ 50%]  (Sampling)
+Iteration:  720 / 1200 [ 60%]  (Sampling)
+Iteration:  840 / 1200 [ 70%]  (Sampling)
+Iteration:  960 / 1200 [ 80%]  (Sampling)
+Iteration: 1080 / 1200 [ 90%]  (Sampling)
+Iteration: 1200 / 1200 [100%]  (Sampling)
+
+ Elapsed Time: 40227.4 seconds (Warm-up)
+               2763.95 seconds (Sampling)
+               42991.3 seconds (Total)
+
+
+/home/napha/INF367A/stanenv/lib/python3.6/site-packages/pandas/io/pickle.py:88: UserWarning: Pickling fit objects is an experimental feature!
+The relevant StanModel instance must be pickled along with this fit object.
+When unpickling the StanModel must be unpickled first.
+  f.write(pickle.dumps(obj, protocol=protocol))
+WARNING:pystan:Maximum (flat) parameter count (1000) exceeded: skipping diagnostic tests for n_eff and Rhat.
+To run all diagnostics call pystan.check_hmc_diagnostics(fit)
+modelselect.py:106: UserWarning: Pickling fit objects is an experimental feature!
+The relevant StanModel instance must be pickled along with this fit object.
+When unpickling the StanModel must be unpickled first.
+  pickle.dump(hist2, f)
+evaltime:  4334.661714076996
+Using cached StanModel

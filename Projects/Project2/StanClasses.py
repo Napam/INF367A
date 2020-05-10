@@ -64,7 +64,8 @@ class BaseStanFactorizer:
         col_inds = df.iloc[:,1]
         ratings = df.iloc[:,2].values
 
-        y_preds = np.array([X[row_inds, col_inds] for X in Xs])
+        # Equivalent to np.array([X[row_inds, col_inds] for X in Xs])
+        y_preds = Xs[:,row_inds, col_inds]
         abserrors = np.abs(y_preds - ratings)
         return abserrors.mean()
 
@@ -82,7 +83,7 @@ class BaseStanFactorizer:
                     yerr=[means-lower_bounds, upper_bounds-means],
                     fmt='o', *args, **kwargs)
 
-    def ci(self, n_elements: int=20, row_inds: Iterable=None, 
+    def ci(self, n_elements: int=20, thin: int=1, row_inds: Iterable=None, 
            col_inds: Iterable=None, n_samples: int=1000, p=0.95, plot: bool=False, 
            ax: 'matplotlib.Axes'=None, *args, **kwargs):
         '''
@@ -112,7 +113,7 @@ class BaseStanFactorizer:
         self.assert_fitted()
 
         # This is equivalent to Xs = np.array([U@V for U,V in zip(Us, Vs)])
-        Xs = self.Us@self.Vs
+        Xs = self.Us[::thin]@self.Vs[::thin]
 
         if (row_inds is None) or (col_inds is None):
             assert (row_inds and col_inds) is None,\
@@ -125,7 +126,10 @@ class BaseStanFactorizer:
 
         # Sample from predictive distribution
         picks = np.random.randint(0, len(Xs), n_samples)
+        # Equivalent to np.array([X[row_inds, col_inds] for X in Xs[picks]])
+        # It picks the relevant predicted elemnts, hence the name P
         P = Xs[picks][:,row_inds, col_inds]
+        # Sample from likelihood distribution
         P = self._likelihood_sample(P, picks)
         P.sort(axis=0)
 

@@ -1,0 +1,7 @@
+
+Gradient evaluation took 0.07441 seconds
+1000 transitions using 10 leapfrog steps per transition would take 744.1 seconds.
+Adjust your expectations accordingly!
+
+
+Iteration:    1 / 2000 [  0%]  (Warmup)
