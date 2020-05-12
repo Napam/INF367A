@@ -149,12 +149,21 @@
     To summarize the parameters for the ARD priors: $\mu_U=0,\ \sigma_U=5,\ \mu_V=0,\ \sigma_V=5,\ a_\alpha=1,\ b_\alpha=0.08, \ a_\beta=1,\ b_\beta=1$.
 
 \section{Model selection}
-We do model selection to find the best performing model on the dataset. There are many hyperparameters that can be tuned such as the scale and shape of gamma distributions for the $\beta$-value for the models. However, as the training time takes quite a while for each model, we limit the hyperparameter search to finding a good value for $k$, that is the latent dimension of the matrix factors $\Um, \Vm$. 
+We do model selection to find the best performing model on the dataset. There are many hyperparameters that can be tuned such as the scale and shape of gamma distributions for the $\beta$-value for the models. However, as the training time takes quite a while for each model, we limit the hyperparameter search to just finding a good value for $k$, that is the latent dimension of the matrix factors $\Um, \Vm$. We will subsample the data for the model selection part to speed up the process.
 
-After determining the best candidate on model the model selection, said candidate will be trained on $90\%$ of all the data, and then validated on the remaining $10\%$.
+After determining the best candidate model the model selection, said candidate will be trained on $90\%$ of all the data, and then validated on the remaining $10\%$.
+
+    \subsection*{Quick look at the data}
+    A rating is an integer ranging from $1$ to $5$. As mentioned earlier, the dataset contains $100 000$ ratings from $943$ users on $1682$. That means we have a $943 \times 1682$ matrix, where only $100000$ elements are observed, implying we have a sparse matrix, where only $6.3\%$ of the elements are observed.  
+    \begin{figure}[H]
+        \centering
+        \caption{Distribution of ratings.}
+        \includegraphics[width=0.6\textwidth]{ratings.pdf}
+    \end{figure}
+    Not only is the matrix rather sparse, but the ratings are also unbalanced, meaning we have an unbalanced dataset. This may lead to models that overfit to the most frequent ratings, that is the rating of $4$.  
 
     \subsection{Data subsampling}
-    To speed up the model selection process we do model selection on a subset of the data. We subsample 250 users and 250 movies. The matrix is sparse, so we want to subsample the data such that we get the "dense parts" of the matrix. To do this we pick the top 250 users based on number of movies rated, then we pick the top 250 movies with the most ratings from said users. This produces a $250 \times 250$ matrix with about $50\%$ observed elements. From the subset we create a train ($90\%$ of the subset) and a hold out set (the remaining $10\%$). The train set will be used for training, while the hold out set will be used for validation.
+    To speed up the model selection process we do model selection on a subset of the data. We subsample 250 users and 250 movies. The matrix is sparse, so we want to subsample the data such that we get the "dense parts" of the matrix. To do this we pick the top 250 users based on number of movies rated, then we pick the top 250 movies with the most ratings from said top users. This produces a $250 \times 250$ matrix with about $50\%$ observed elements. From the subset we create a train ($90\%$ of the subset) and a hold out set (the remaining $10\%$). The train set will be used for training, while the hold out set will be used for validation.
 
     \subsection{Model selection results}
     We try $1$ to $5$ latent dimensions for each model. We do $2000$ iterations using Stan's HMC sampler, and set the "max\_treedepth" control argument to $15$ (the warnings from Stan told to) when sampling for each model.
@@ -164,7 +173,7 @@ After determining the best candidate on model the model selection, said candidat
 
     \begin{table}[H]
         \centering
-        \caption{k is the latent dimension, train time shows training time in seconds, train MAE is the mean absolute error on the training set, while val MAE is the mean absolute error on the validation set. The table is sorted with respect to val MAE in ascending order.}
+        \caption{k is the latent dimension, train time shows training time in seconds, train MAE is the mean absolute error on the training set, while val MAE is the mean absolute error on the validation set. The table is sorted with respect to val MAE in ascending order (lower is better).}
         \label{table:modelselection}
         \begin{tabular}{llrr|rr}
             \toprule
@@ -191,7 +200,7 @@ After determining the best candidate on model the model selection, said candidat
     
     \begin{table}[H]
         \centering
-        \caption{This table shows the min, max, mean and standard deviation of the $\bs{\rhat}$ values from the sampling. The order of the rows correspond to Table \ref{table:modelselection}. Rhat gives an indication of whether the model parameters have converged \cite{Rhat}. It should be noted that convergence does not imply that the sampling process managed to sample from the true posterior distribution. According to the Stan warnings, a $\rhat$ value for a parameter between 0.9 and 1.1 indicates likely convergence.}
+        \caption{This table shows the min, max, mean and standard deviation of the $\bs{\rhat}$ values from the sampling of all the models. The order of the rows correspond to Table \ref{table:modelselection}. Rhat gives an indication of whether the model parameters have converged \cite{Rhat}. It should be noted that convergence does not imply that the sampling process managed to sample from the true posterior distribution. According to the Stan warnings, a $\rhat$ value for a parameter between 0.9 and 1.1 indicates likely convergence. Ideally, the $\rhat$ values should be $1$.}
         \label{table:rhats}
         \begin{tabular}{llr|rr|rr}
             \toprule
@@ -243,26 +252,42 @@ After determining the best candidate on model the model selection, said candidat
         \end{tabular}
     \end{table}
 
-    It clearly seems to be that $3$ latent dimensions, that is the $k$ value for $\Um$ and $\Vm$, is the most optimal one with respect to validation mae since the top three are all three different models, but with $k=3$. The top 3 in ascending order is ARD, Non-negative and Normal, with the validation MAEs of $0.6822, 0.6827, 0.6827$ respectively. The scores are somewhat close to each other, but let us assess the convergence ($\rhat$) and the number of effective samples. 
+    It clearly seems to be that $3$ latent dimensions, that is the $k$ value for $\Um$ and $\Vm$, is the most optimal one with respect to validation MAE since the top three are all the three different types of models, all with $k=3$. The top 3 in ascending order is ARD, Non-negative and Normal, with the validation MAEs of $0.6822, 0.6827, 0.6827$ respectively. The scores are somewhat close to each other, but let us assess the convergence ($\rhat$) and the number of effective samples. 
 
     \vspace{3mm}
-    We assess table \ref{table:rhats} and \ref{table:neffs} to get some indication on the convergence and $\neff$. The Non-negative model manages to get the best indications for convergence, the mean $\rhat$ is closest to one ($1.0032$), and has least variance ($0.005$) compared to the others. It also manages to get the highest value for mean number of effictive samples ($318$), but with a somewhat high standard deviation of around $223$ (we want to have high mean and standard deviation). The ARD model comes in second concerning the mean $\rhat$ of $1.04$ and mean $\neff$ of $275$. The Normal model looks rather horrible with bad convergence (mean $\rhat$ of $1.21$), and a very low mean $\neff$ of $10$, so we will not take it into any other further consideration. To get a closer look at the $\rhat$ and $\neff$ values for the ARD and the Non-negative model, we plot the correspoding histograms.
+    We assess table \ref{table:rhats} and \ref{table:neffs} to get some indication on the convergence and $\neff$. The Non-negative model manages to get the best indications for convergence, the mean $\rhat$ is closest to one ($1.0032$), and has least variance ($0.005$) compared to the others. It also manages to get the highest value for mean number of effective samples ($318$), but with a rather high standard deviation of around $223$ (we want to have high mean and low standard deviation). The ARD model comes in second with the mean $\rhat$ of $1.04$ and mean $\neff$ of $275$. The Normal model looks rather horrible with bad convergence (mean $\rhat$ of $1.21$), and a very low mean $\neff$ of $10$, so we will not take it into any other further consideration. To get a closer look at the $\rhat$ and $\neff$ values for the ARD and the Non-negative model, we plot the correspoding histograms.
+
+    \begin{figure}[H]
+        \centering
+        \caption{Here we see the $\rhat$ histograms on the left, and the $\neff$ histograms on the right. The top histograms shows the values from the ARD model, the middle histograms shows the values from Non-negative model, whilst the bottom histograms shows the top two histograms together.}
+        \includegraphics[width=0.85\textwidth]{ARD_hists.pdf}
+        \includegraphics[width=0.85\textwidth]{NMF_hists.pdf}
+        \includegraphics[width=0.85\textwidth]{ARDNMF_hists.pdf}
+    \end{figure}
+
+    We can see that the Non-negative model fares much better regarding the $\rhat$ values, the $\rhat$ values for the parameters are clearly much closer to $1$ overall compared to ARD. Regarding the number of effective samples we see that the Non-negative model "looks better", as it does not have that extreme peak at the low number bin for $\neff$ opposed to the ARD model. However, if one ignores the peak on the $\neff$ histogram for the ARD model, it seems to be that the ARD manages to get more effective samples for the parameters that "makes it". 
+
+    We conclude that the Non-negative model is the overall winner of the model selection, even if it got second place regarding the MAE on the validation set, but has way better indication of convergence opposed to ARD, and has a much nicer looking histogram of $\neff$, which indicates that it probably managed to sample more from the true posterior. This decision is more of a Bayesian way of thinking. 
 
 \section{Evaluating the best model}
-We then try to train the best candidate from the model selection, that is the ARD model using $3$ latent dimentions on a much larger amount of data. It should be noted that we effectively scrambled the data quite a bit during the early stages of experementing (we didn't seed in the beginning), thus we don't really have a proper test set, that is data that we have not touched whatsoever.
+We train the best candidate from the model selection, that is the Non-negative model using $3$ latent dimentions on a much larger amount of data. It should be noted that we effectively scrambled the data quite a bit during the early stages of experementing (we didn't seed in the beginning), thus we don't really have a proper test set, that is data that we have not touched whatsoever.
 
 \vspace{5mm}
 Using the whole dataset of $100000$ ratings, we create yet another train and validation set, where $90\%$ is used for the training set, and the rest for validation.
 
 \begin{figure}[H]
     \centering
-    \caption{Credible intervals of 1500 elements from the predictive distribution. The firebrick-red dots are the means of predictive samples. The yellow dots are the true ratings. The elements correspond to the elements in the test-set.}
+    \caption{We visualize the credible intervals for the validation ratings. Each spaghetti colored vertical line represents the $95\%$ credible interval of a rating from the predictive distribution. Each credible interval is computed from $400$ samples from the predictive distribution. The spaghetti sauce colored dots are the means of predictive samples. The yellow dots are the true ratings.}
     \includegraphics[width=\textwidth]{credibles.pdf}
 \end{figure}
+It does not look that great, at least we have some kind of trend, but the model does not have much credibility as the credible intervals are humongous. 
 
 \section{Discussion}
     \subsection*{Bad Rhat and low effictive samples}
-    Some models had low convergence, while some had low effective samples, and some were low on both. As an attempt to mitigate said problems, we simply tried to increase the number of sampling iterations. We ended up using 2000 iterations for both the model selection and model evaluation. We did not see that much of a difference between 1200 sampling iterations and 2000 when it came convergence, but of course we could expect more number of effective samples.
+    Some models had low convergence, while some had low effective samples, and some were low on both. As an attempt to mitigate said problems, we simply tried to increase the number of sampling iterations. We ended up using 2000 iterations for both the model selection and model evaluation. We did not see that much of a difference between 1200 sampling iterations and 2000 when it came convergence, but of course we could generally expect a little higher number of effective samples at the cost of computating times.
+
+    \subsection*{Extremely sampling time when many datapoints for Non-negative model}
+    For some reason, training the Non-negative model on $900000$ ratings was extremely slow (2000 iterations, max\_treedepth=15). It took $144172$ seconds to finish, that is a bit over $40$ hours! 
 
 % \bibliographystyle{apalike}
 \bibliographystyle{ieeetr}
