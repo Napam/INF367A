@@ -293,11 +293,11 @@ As expected, the model has in a sense overfitted to the rating of $4$, that is t
         Mean CI length & 3.5460 \\
         Train MAE & 0.6845 \\
         Validation MAE & 0.7435 \\
-        Train time & 144172 seconds\\
+        Train time & 144172 s\\
         \bottomrule
     \end{tabular}
 \end{table}
-The train MAE and validation MAE on the train and validation sets for model selection were better with the values of $0.6510$ and $0.6822$ respectively (compared to the values on the much larger dataset). This is reasonable to expect, as the larger dataset is much more sparse compared to the small one used for model selection.
+The train MAE and validation MAE on the train and validation sets for model selection were better with the values of $0.6510$ and $0.6822$ respectively (compared to the values on the much larger dataset). This is reasonable to expect, as the larger dataset is much more sparse compared to the small one used for model selection. With a validation MAE of $0.7435$, we can expect that the model is gennerally off with a $1$ value on the ratings. 
 
 \section{Discussion}
     \subsection*{Bad Rhat and low effictive samples}
