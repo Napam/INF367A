@@ -1,6 +1,6 @@
 
-Gradient evaluation took 0.07441 seconds
-1000 transitions using 10 leapfrog steps per transition would take 744.1 seconds.
+Gradient evaluation took 0.10912 seconds
+1000 transitions using 10 leapfrog steps per transition would take 1091.2 seconds.
 Adjust your expectations accordingly!
 
 
@@ -17,13 +17,13 @@ Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Iteration: 2000 / 2000 [100%]  (Sampling)
 
- Elapsed Time: 91161.5 seconds (Warm-up)
-               5509.82 seconds (Sampling)
-               96671.3 seconds (Total)
+ Elapsed Time: 88157.5 seconds (Warm-up)
+               11868.8 seconds (Sampling)
+               100026 seconds (Total)
 
 WARNING:pystan:Maximum (flat) parameter count (1000) exceeded: skipping diagnostic tests for n_eff and Rhat.
 To run all diagnostics call pystan.check_hmc_diagnostics(fit)
-train_big_ard.py:59: UserWarning: Pickling fit objects is an experimental feature!
+train_big_normal.py:59: UserWarning: Pickling fit objects is an experimental feature!
 The relevant StanModel instance must be pickled along with this fit object.
 When unpickling the StanModel must be unpickled first.
   pickle.dump(hist, f)
