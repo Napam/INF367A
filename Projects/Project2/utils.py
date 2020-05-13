@@ -20,6 +20,23 @@ from tqdm import tqdm
 from time import time
 
 def fit_and_evaluate(args: tuple):
+    '''
+    Fits and evaluate model from StanClasses.py
+
+    Parameter
+    ---------
+    args: tuple as (model class, init_kwargs, X_train, X_val) or
+          (integer index, model class, init_kwargs, X_train, X_val)
+
+          This function is used for parallell processing, therefore the weird 
+          argument setup. The integer index is used to keep track of order 
+          when using parallell processing. 
+
+    Returns
+    -------
+    (model_object, fit_time, train_mae, val_mae) or
+    (integer index, model_object, fit_time, train_mae, val_mae)
+    '''
     with_index = False
     try:
         model, init_kwargs, X_train, X_val = args
@@ -45,9 +62,36 @@ def fit_and_evaluate(args: tuple):
     else:
         return model_object, fit_time, train_mae, val_mae
 
-def fit_and_evaluate_models(models: Iterable, X_train, X_val=None, candidate_kwargs: dict={},
-                            static_kwargs: dict={}, verbose=True, ascii=False):
-        
+def fit_and_evaluate_models(models: Iterable, X_train: Union[np.ndarray, pd.DataFrame], 
+                            X_val: Union[np.ndarray, pd.DataFrame]=None, 
+                            candidate_kwargs: dict={}, static_kwargs: dict={}, 
+                            verbose=True, ascii=False):
+    '''
+    Given models, and candidate kwargs, trains the models on every combination candidate_kwargs.
+
+    Parameters
+    ----------
+    models: Iterable of model classes
+
+    X_train: Dataset used for training
+
+    X_val: Dataset used for validation
+
+    candidate_kwargs: Keyword arguemts to be trained on. They will be turned into a 
+                      grid of all combinations. Think of how GridSearch works. 
+
+    static_kwargs: Shared keyword arguments for all the models. 
+
+    verbose: Shows tqdm if True, True by default
+
+    ascii: Whether tqdm bar should print ascii (for compatibility)
+
+    Returns
+    -------
+    hist: dictionary containing fitted model object, the corresponding parameters,
+          fit_time, train_mae, val_mae.
+    '''
+
     hist = {'model':[], 'params':[], 'fit_time':[], 'train_mae':[], 'val_mae':[]}
     
     map_args = []
@@ -65,12 +109,15 @@ def fit_and_evaluate_models(models: Iterable, X_train, X_val=None, candidate_kwa
         
         map_args.append((i, model, paramdict, X_train, X_val))
     
+    # Train candidates on separate processes 
     with Pool(None) as p:
         fit_iterator = tqdm(
             p.imap_unordered(fit_and_evaluate, map_args), total=n_params,
             desc='Fitting models', disable=not verbose, unit='model', position=0,
             ascii=ascii
         )
+        # Note that imap_unordered is used, so the ordering will probably be 
+        # scrambled. 
         results = list(fit_iterator)
         
     for result in results:
@@ -84,12 +131,23 @@ def fit_and_evaluate_models(models: Iterable, X_train, X_val=None, candidate_kwa
     return hist
 
 def get_stan_code(filename: str):
+    '''
+    Given filename, read the text and return it. 
+    '''
     with open(filename, 'r') as f:
         lines = f.readlines()
         return str.join(' ', lines)
 
 def StanModel_cache(model_code, model_name=None, cache_dir='stan_cache', **kwargs):
-    """Use just as you would `stan`"""
+    """
+    Use just as you would `stan`
+    
+    Copy pasted from Stan documentation. This function caches compiled Stan 
+    models.
+
+    I have added some text cleaning so it wont recompile if I add comments or 
+    newlines or whatever. 
+    """
     
     # Clean text to avoid stupid recompilations
 
@@ -126,6 +184,26 @@ def get_ml100k_data(directory:str, subsample_top_users: int=None,
                     subsample_top_items: int=None):
     '''
     Gets ml-100k data
+
+    Parameters
+    ----------
+    directory: path to directory with the ml100k files
+    
+    subsample_top_users: If given an integer, it subsamples the dataset such that
+                         you get the top users based on number of movies they have 
+                         rated.
+
+    subsample_top_items: If given an integer, it subsamples dataset such that you 
+                         get the top movies based on the number reviews they have
+                         gotten. If subsample_top_users is specified as well, it 
+                         will choose the top movies based on said subsampled users. 
+
+    Returns
+    --------
+    (df_users, df_item_features, df_item_metadata)
+    df_users is the data "matrix" in sparse format. 
+    df_item_features is the genre infromation for the movies. Not really used. 
+    df_item_metadata I dont really remember what it was. I dont really use it. 
     '''
     data_path = os.path.join(directory, 'u.data')
     genre_path = os.path.join(directory, 'u.genre')

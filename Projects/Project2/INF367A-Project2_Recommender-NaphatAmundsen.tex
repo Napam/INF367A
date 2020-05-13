@@ -79,10 +79,10 @@
 \section*{Introduction}
     This project is about creating a bayesian recommender engine specifically for movie ratings. There are different types of recommender systems. For this project, we will focus on \textit{collaborative filtering} where we try to predict a user's preference based on preferences of other users. We are given the MovieLens 100K dataset, which essentially consists of movies, users and the users ratings for the movies. The dataset contains $100 000$ ratings from $943$ users on $1682$ movies. The data is sparse, because not every user has rated every movie. The task is to predict the users ratings on movies that they have not seen. 
 
-    The recommender system is based on Bayesian matrix factorization, that is, we want to predict ratings as well as estimating the uncertainty in the predictions. We try using three different models to estimate the matrix factors.
+    The recommender system is based on Bayesian matrix factorization, that is, we want to predict ratings by matrix factorization methods as well as estimating the uncertainty in the predictions. We try using three different probabilistic models to estimate the matrix factors.
 
 \section{The models}
-    The user-rating pairs can be represented with the matrix $\Xm$, where each row represents a user, and each column represents as movie. To predict the users' rating on unreviewed movies, we try to factorize matrix into two matrices $\Um, \Vm$ such that $UV \approx X$, where $k$ denotes the number of the latent dimensions of the factors. The matrices $U,V$ will be approximated using using Hamitonian Monte Carlo implemented in Stan \cite{HMC}. Hopefully, the reconstruction of $X$, that is $UV$ should "fill" the missing ratings with ratings that fits each user well.
+    The user-rating pairs can be represented with the matrix $\Xm$, where each row represents a user, and each column represents as movie. To predict the users' rating on unreviewed movies, we try to factorize matrix $\Xm$ into two matrices $\Um, \Vm$ such that $UV = \hat{X} \approx X$, where $k$ denotes the number of the latent dimensions of the factors. The matrices $U,V$ will be approximated using using Hamitonian Monte Carlo implemented in Stan \cite{HMC}. Hopefully, the reconstruction of $X$ from $U$ and $V$ manages to predict unseen ratings, that is $UV$ should "fill" the missing ratings with ratings that fits each user well.
 
     \subsection*{Data standard deviation}
         All the models share the same distribution for the data, that is $X_{ij}\sim N((UV)_{ij}, \beta)$. The prior for $\beta$ is chosen to be a gamma distribution with scale$=1$, and shape$=1$, which seems reasonable as we expect the data points to be close to whatever $UV$ estimates. Note that this is effectively an exponential distribution with rate $1$.
@@ -94,7 +94,7 @@
         \end{figure}
     
     \subsection{Normal model}
-    This model is inspired from the "regular" way of doing Bayesian linear regression, that is the elements of $U$ and $V$ are normally distributed. To give more flexibility to the user, the normal distributions for $U$ and $V$ each has different sets of user specified parameters, that is the means and standard deviations. The data points are then assumed to be normally distributed, where the mean is what $UV$ is at the corresponding element. The standard deviation is assumed to be distributed by a gamma distribution with user specified values for shape and scale. The model rather is "vanilla", and will serve as a baseline to be beaten. We would say that it is reasonable to expect the model to at least be better than random because it generally works regression tasks.
+    This model is inspired from the "regular" way of doing Bayesian linear regression, that is the elements of $U$ and $V$ are normally distributed. To give more flexibility to the user, the normal distributions for $U$ and $V$ each has different sets of user specified parameters, that is the means and standard deviations. The model rather is "vanilla", and will serve as a baseline to be beaten. We would say that it is reasonable to expect the model to at least be better than random because it generally works regression tasks.
     \begin{align*}
         U_{ij}  &\sim N(\mu_U, \sigma_U) \\
         V_{ij}  &\sim N(\mu_V, \sigma_V) \\
@@ -108,7 +108,7 @@
     We set the the means for the elements in $U$ and $V$ to be $0$, and set the standard deviations to be $5$, just to cover the range of the ratings within one standard deviation. That is: $\mu_U=0,\ \sigma_U=5,\ \mu_V=0,\ \sigma_V=5,\ a_\beta=1,\ b_\beta=1$.
 
     \subsection{Non-negative factorization model}
-    The idea here is to constrain $U$ and $V$ to consist only of positive numbers, as the ratings are only positive after all. This model is very much like the normal model mentioned above, but the elements of $U$ and $V$ are gamma distributed instead. This model should still work based on the same logic as why the normal works, it can do regression, but this one here the constraint that the model parameters must be positive. 
+    The idea here is to constrain $U$ and $V$ to consist only of positive numbers, as the ratings are only positive after all. This model is very much like the normal model mentioned above, but the elements of $U$ and $V$ are gamma distributed instead. This model should still work based on the same logic as why the normal model works, it can do regression, but this one here has the constraint that the model parameters must be positive. 
     \begin{align*}
         U_{ij} &\sim \opGamma(a_U, b_U) \\
         V_{ij} &\sim \opGamma(a_V, b_V) \\
@@ -119,7 +119,7 @@
     User defined variables: $a_U, b_U, a_V, b_V, a_\beta, b_\beta$.
     
     \vspace{3mm}
-    We specify the scale and shape such that the density "huddles" around $1$, as multiplying $\Um$ and $\Vm$ will involve a lot of multiplications and additions when reconstructing $\Xm$, which will have the flexibility to cover the whole range and ratings even if the elements of $U$ and $V$ are around $1$, thus we find it reasonable to expect values to not be very large. We achieve such a gamma distribution by setting the scale to $2$ and the shape to $1$.
+    We specify the scale and shape such that the density "huddles" around $1$, as multiplying $\Um$ and $\Vm$ will involve a lot of multiplications and additions when reconstructing $\Xm$, which will have the flexibility to cover the whole range and ratings even if the elements of $U$ and $V$ are around $1$, thus we find it reasonable to expect that the elements to not be very large. We achieve such a gamma distribution by setting the scale to $2$ and the shape to $1$.
     \begin{figure}[H]
         \centering
         \includegraphics[width=0.5\textwidth]{nmfprior.pdf}
@@ -151,7 +151,7 @@
 \section{Model selection}
 We do model selection to find the best performing model on the dataset. There are many hyperparameters that can be tuned such as the scale and shape of gamma distributions for the $\beta$-value for the models. However, as the training time takes quite a while for each model, we limit the hyperparameter search to just finding a good value for $k$, that is the latent dimension of the matrix factors $\Um, \Vm$. We will subsample the data for the model selection part to speed up the process.
 
-After determining the best candidate model the model selection, said candidate will be trained on $90\%$ of all the data, and then validated on the remaining $10\%$.
+After determining the best candidate model from the model selection, said candidate will be trained on $90\%$ of all the data, and then validated on the remaining $10\%$.
 
     \subsection*{Quick look at the data}
     A rating is an integer ranging from $1$ to $5$. As mentioned earlier, the dataset contains $100 000$ ratings from $943$ users on $1682$. That means we have a $943 \times 1682$ matrix, where only $100000$ elements are observed, implying we have a sparse matrix, where only $6.3\%$ of the elements are observed.  
@@ -160,13 +160,13 @@ After determining the best candidate model the model selection, said candidate w
         \caption{Distribution of ratings.}
         \includegraphics[width=0.6\textwidth]{ratings.pdf}
     \end{figure}
-    Not only is the matrix rather sparse, but the ratings are also unbalanced, meaning we have an unbalanced dataset. This may lead to models that overfit to the most frequent ratings, that is the rating of $4$ in this case.
+    Not only is the matrix rather sparse, but the ratings are also unbalanced, meaning we have an unbalanced dataset. This may lead to models that overfit to the most frequent rating, that is the rating of $4$ in this case.
 
     \subsection{Data subsampling}
     To speed up the model selection process we do model selection on a subset of the data. We subsample 250 users and 250 movies. The matrix is sparse, so we want to subsample the data such that we get the "dense parts" of the matrix. To do this we pick the top 250 users based on number of movies rated, then we pick the top 250 movies with the most ratings from said top users. This produces a $250 \times 250$ matrix with about $50\%$ observed elements. From the subset we create a train ($90\%$ of the subset) and a hold out set (the remaining $10\%$). The train set will be used for training, while the hold out set will be used for validation.
 
     \subsection{Model selection results}
-    We try $1$ to $5$ latent dimensions for each model. We do $2000$ iterations using Stan's HMC sampler, and set the "max\_treedepth" control argument to $15$ (the warnings from Stan told to) when sampling for each model.
+    We tried $1$ to $5$ latent dimensions for each model. We do $2000$ iterations using Stan's HMC sampler, and set the "max\_treedepth" control argument to $15$ (the warnings from Stan told to) when sampling for each model. The reason we try such "low" numbers for latent dimensions come from undocumented experementing, which revealed that the number of latent dimensions is probably on the lower side, as in under $10$.
 
         \subsubsection*{Scoring metric}
         To score the models we take the mean absolute error of all the predicted ratings to the actual ratings. That is, for each sampled $U$ and $V$, we get a corresponding $\hat{X}$, which contains predictions for the movie ratings. We calcuate the absolute error of the ratings contained in $\hat{X}$ to the ratings in the validation set. We do this for every sampled pairs of $U$ and $V$, and then we calculate the mean of all the errors. 
@@ -200,7 +200,7 @@ After determining the best candidate model the model selection, said candidate w
     
     \begin{table}[H]
         \centering
-        \caption{This table shows the min, max, mean and standard deviation of the $\bs{\rhat}$ values from the sampling of all the models. The order of the rows correspond to Table \ref{table:modelselection}. Rhat gives an indication of whether the model parameters have converged \cite{Rhat}. It should be noted that convergence does not imply that the sampling process managed to sample from the true posterior distribution. According to the Stan warnings, a $\rhat$ value for a parameter between 0.9 and 1.1 indicates likely convergence. Ideally, the $\rhat$ values should be $1$.}
+        \caption{This table shows the min, max, mean and standard deviation of the $\bs{\rhat}$ values from the sampling of all the models. The order of the rows correspond to Table \ref{table:modelselection}. $\rhat$ gives an indication of whether the model parameters have converged \cite{Rhat}. It should be noted that convergence does not imply that the sampling process managed to sample from the true posterior distribution. According to the Stan warnings, a $\rhat$ value for a parameter between 0.9 and 1.1 indicates likely convergence. Ideally, the $\rhat$ values are $1$.}
         \label{table:rhats}
         \begin{tabular}{llr|rr|rr}
             \toprule
@@ -227,7 +227,7 @@ After determining the best candidate model the model selection, said candidate w
 
     \begin{table}[H]
         \centering
-        \caption{This table shows the min, max, mean and standar deviation of the $\bs{\neff}$ (number of effective samples) values from the sampling. The order of the rows correspond to Table \ref{table:modelselection}. Number of effective samples is a estimate on how many samples of each model parameter got sampled from the true posterior \cite{Neff}.}
+        \caption{This table shows the min, max, mean and standard deviation of the $\bs{\neff}$ (number of effective samples) values from the sampling. The order of the rows correspond to Table \ref{table:modelselection}. Number of effective samples is a estimate on how many samples of each model parameter got sampled from the true posterior \cite{Neff}. It is desired to have many effective samples.}
         \label{table:neffs}
         \begin{tabular}{llr|rr|rr}
             \toprule
@@ -252,7 +252,7 @@ After determining the best candidate model the model selection, said candidate w
         \end{tabular}
     \end{table}
 
-    It clearly seems to be that $3$ latent dimensions, that is the $k$ value for $\Um$ and $\Vm$, is the most optimal one with respect to validation MAE since the top three are all the three different types of models, all with $k=3$. The top 3 in ascending order is ARD, Non-negative and Normal, with the validation MAEs of $0.6822, 0.6827, 0.6827$ respectively. The scores are somewhat close to each other, but let us assess the convergence ($\rhat$) and the number of effective samples. 
+    It clearly seems to be that $3$ latent dimensions, that is the $k$ value for $\Um$ and $\Vm$, is the most optimal one with respect to validation MAE since the top three are all the three different types of models, all with $k=3$. The top 3 in descending order is ARD, Non-negative and Normal, with the validation MAEs of $0.6822, 0.6827, 0.6827$ respectively. The scores are somewhat close to each other, but let us assess the convergence ($\rhat$) and the number of effective samples. 
 
     \vspace{3mm}
     We assess table \ref{table:rhats} and \ref{table:neffs} to get some indication on the convergence and $\neff$. The Non-negative model manages to get the best indications for convergence, the mean $\rhat$ is closest to one ($1.0032$), and has least standard deviation ($0.005$) compared to the others. It also manages to get the highest value for mean number of effective samples ($318$), but with a rather high standard deviation of around $223$ (we want to have high mean and low standard deviation). The ARD model comes in second with the mean $\rhat$ of $1.04$ and mean $\neff$ of $275$. The Normal model looks rather horrible with bad convergence (mean $\rhat$ of $1.21$), and a very low mean $\neff$ of $10$, so we will not take it into any other further consideration. To get a closer look at the $\rhat$ and $\neff$ values for the ARD and the Non-negative model, we plot the correspoding histograms.
@@ -277,11 +277,11 @@ Using the whole dataset of $100000$ ratings, we create yet another train and val
 
 \begin{figure}[H]
     \centering
-    \caption{We visualize the credible intervals for the validation ratings. Each spaghetti colored vertical line represents the $95\%$ credible interval of a rating from the predictive distribution. Each credible interval is computed from $1000$ samples from the predictive distribution. Each spaghetti sauce colored dot is the mean of said 400 predictive samples for each rating. The yellow dots (together, they resemble lines) are the true ratings. The plot is plotted with high transparency to de-emphasize outliers and "undense" parts.}
+    \caption{We visualize the credible intervals for the validation ratings. Each spaghetti colored vertical line represents the $95\%$ credible interval of a rating from the predictive distribution. Each credible interval is computed from $1000$ samples from the predictive distribution. Each spaghetti sauce colored dot is the mean of said 1000 predictive samples for each rating. The yellow dots (together, they resemble lines) are the true ratings. The plot is plotted with high transparency to de-emphasize outliers and "undense" parts.}
     \label{fig:credibles}
     \includegraphics[width=\textwidth]{credibles.pdf}
 \end{figure}
-As expected, the model has in a sense overfitted to the rating of $4$, that is the predictive means are generally closer to the value of $4$ opposed to rest. However, the model is not clueless to predicting ratings, as we can see that the lower bounds, upper bounds and means of the credible intervals has this stair like structure respective to the true value. This at least indicates that this is certianly better than randomly guessing the ratings.
+As expected, the model has in a sense overfitted to the rating of $4$, that is the predictive means are generally closer to the value of $4$ opposed to rest. However, the model is not clueless to predicting ratings, as we can see that the lower bounds, upper bounds and means of the credible intervals has this stair like structure respective to the true value. This at least indicates that the model does not guess randomly.
 
 \begin{table}[H]
     \centering
@@ -297,11 +297,11 @@ As expected, the model has in a sense overfitted to the rating of $4$, that is t
         \bottomrule
     \end{tabular}
 \end{table}
-The train MAE and validation MAE on the train and validation sets for model selection were better with the values of $0.6510$ and $0.6822$ respectively (compared to the values on the much larger dataset). This is reasonable to expect, as the larger dataset is much more sparse compared to the small one used for model selection. With a validation MAE of $0.7435$, we can expect that the model is gennerally off with a $1$ value on the ratings. 
+The train MAE and validation MAE on the train and validation sets for model selection were better with the values of $0.6510$ and $0.6822$ respectively (compared to the values on the much larger dataset). This is reasonable to expect, as the larger dataset is much more sparse compared to the small one used for model selection. With a validation MAE of $0.7435$, we can expect that the model is gennerally off with a $1$ value on unseen ratings (altough keep in mind that this is a validatioh set, and not a proper test set). 
 
 \section{Discussion}
     \subsection*{Bad Rhat and low effictive samples}
-    Some models had low convergence, while some had low effective samples, and some were low on both. As an attempt to mitigate said problems, we simply tried to increase the number of sampling iterations. We ended up using 2000 iterations for both the model selection and model evaluation. We did not see that much of a difference between 1200 sampling iterations and 2000 when it came convergence, but of course we could generally expect a little higher number of effective samples at the cost of computating times.
+    Some models had low convergence and low number of effective samples. As an attempt to mitigate said problems, we simply tried to increase the number of sampling iterations. We ended up using 2000 iterations for both the model selection and model evaluation. We did not see that much of a difference between 1200 sampling iterations and 2000 when it came convergence, but of course we could generally expect a little higher number of effective samples at the cost of computating times.
 
     \subsection*{Ways to avoid overfitting}
     We could for example train on a stratified subsample, that is subsamples that are perfectly balanced in terms of ratings, however that would significantly reduce the amount of available training data, as we have to throw away quite a bit.
@@ -311,7 +311,7 @@ The train MAE and validation MAE on the train and validation sets for model sele
 
     \subsection*{What we learned}
     \begin{itemize}
-        \item When working Bayesian models we should take into consideration the uncertainty of things by for example plotting the credible intervals. 
+        \item When working with Bayesian models we should take into consideration the uncertainty of things by for example plotting the credible intervals. 
         \item We should be aware of the implications when we choose a "best model" based on deterministic scoring metrics such as mean absolute error. We could have choosen the ARD model based on the simple reasoning that it scored best on the validation set used in model selection without any further investigation, but after assessing the indicators for convergence and sampling quality, that is the $\rhat$ and $\neff$ values, we observed the samples of the ARD model may not be as good as we would like. Especially when we have a candidate was right behind in terms of MAE, but had better indicators for both convergence and sampling quality. Not that it would necessarily be wrong to choose the ARD anyways, it is simply doing a thoughtfull and well educated choice.
         \item It is quite a challenge to predict the behaviour of Stan's Hamitonian Monte Carlo sampler. Some models which we thought should be the easiest and fastest to sample from were the slowest. The sampling time varied a lot between models and number and sampling parameters such as number of iterations. 
     \end{itemize}

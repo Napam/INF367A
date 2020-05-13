@@ -1,3 +1,8 @@
+'''
+This file contains classes that implements a scikit-learn like API for MCMC
+sampling. 
+'''
+
 from abc import abstractmethod
 import pystan
 import numpy as np
@@ -69,10 +74,18 @@ class BaseStanFactorizer:
         abserrors = np.abs(y_preds - ratings)
         return abserrors.mean()
 
-    def _plot_ci(self, n, P, lower_bounds, upper_bounds, ax, *args,
-                 **kwargs):
+    def _plot_ci(self, n: int, P: np.ndarray, lower_bounds: np.ndarray, 
+                 upper_bounds: np.ndarray, ax: 'Axis', *args, **kwargs):
         '''
         Plots credible intervals
+
+        n: Number of elements to plot credible intervals for
+
+        lower_bounds: array consisting of lower bounds of credible interval
+
+        upper_bounds: array consisting of upper bounds of credible interval
+
+        args and kwargs go to ax.errorbar
         '''
         means = P.mean(axis=0)
 
@@ -94,6 +107,9 @@ class BaseStanFactorizer:
         n_elements: Number of elements to calculte credible intervals for, 
                     no effect if col_inds and row_inds are given.
 
+        thin: Thinning value, 1 by default. This is mostly used to reduce RAM
+              usage
+
         row_inds: Optional, which row indices in X to show CIs for
 
         col_inds: Optional, which column indices in X to show CIs for
@@ -105,6 +121,8 @@ class BaseStanFactorizer:
         plot: Optional, to plot credible intervals or not, False by default
 
         ax: Optional, plots on given ax, no effect if show is False
+
+        args and kwargs go to ax.errorbar if plot is True
 
         Returns
         --------
@@ -174,6 +192,7 @@ class SimpleFactorizer(BaseStanFactorizer):
         sigma_x: std of elements in X
         stanfile: file with stancode
         cache_name: name for compiled model
+        stan_kwargs: Kwargs used for stanmodel.fit(**stan_kwargs)
         '''
         super().__init__()
         self.stanfile = stanfile
@@ -190,21 +209,30 @@ class SimpleFactorizer(BaseStanFactorizer):
         self.sigma_x = sigma_x
         self.stan_kwargs = stan_kwargs
 
-    def _likelihood_sample(self, P, picks):
+    def _likelihood_sample(self, P: np.ndarray, picks: np.ndarray):
+        '''
+        This is used to sample from predictive distribution. 
+
+        P: Rating estimates. Is a 2D array, where each row represent the selected
+           elements for a pair of sampled U and V.
+
+        picks: The indices for the elements used to extract the values in P. Not used
+        for this model, but is still there for API compatibility.
+        '''
         self.assert_fitted()
         return np.random.normal(loc=P, scale=self.sigma_x, size=P.shape)
 
     def fit_transform(self, df: pd.DataFrame):
         '''
         Parameters
-        -----------
+        ----------
         df: should represent matrix in sparse format, each row should
-            consists only of [row_index, col_index, value] in that order
+            consists only of [row_index, col_index, value] in that order.
 
         kwargs: keyword arguments for StanModel.sampling()
 
         Returns
-        --------
+        -------
         Sampled values
         (Us, Vs)
         '''
@@ -243,18 +271,25 @@ class NormalFactorizer(BaseStanFactorizer):
         Model:
         U ~ N(mu_u, sigma_u)
         V ~ N(mu_v, sigma_v)
-        X ~ N(UV, sigma_x)
+        beta ~ gamma(a_beta, b_beta)
+        X ~ N(UV, beta)
 
         Parameters
         -----------
         n_components: Embedding dimension
+
         mu_u: mean of elements in U
         sigma_u: std of elements in U
-        mu_v: mean of elements in
+
+        mu_v: mean of elements in V
         sigma_v: std of elements in V
-        sigma_x: std of elements in X
+
+        a_beta: shape of gamma distribution for beta
+        b_beta: scale of gamma distribution for beta
+
         stanfile: file with stancode
         cache_name: name for compiled model
+        stan_kwargs: Kwargs used for stanmodel.fit(**stan_kwargs)
         '''
         super().__init__()
         self.stanfile = stanfile
@@ -274,6 +309,14 @@ class NormalFactorizer(BaseStanFactorizer):
         self.stan_kwargs = stan_kwargs
 
     def _likelihood_sample(self, P, picks):
+        '''
+        This is used to sample from predictive distribution. 
+
+        P: Rating estimates. Is a 2D array, where each row represent the selected
+           elements for a pair of sampled U and V.
+
+        picks: The indices for the elements used to extract the values in P. 
+        '''
         self.assert_fitted()
         return np.random.normal(loc=P, scale=self.betas[picks].reshape(-1,1),
                                 size=P.shape)
@@ -326,20 +369,27 @@ class NonNegativeFactorizer(BaseStanFactorizer):
         Factorization: X \approx UV, where X is the dense matrix
 
         Model:
-        U ~ N(a_u, b_u)
-        V ~ N(a_v, b_v)
-        X ~ N(UV, b_x)
+        U ~ gamma(a_u, b_u)
+        V ~ gamma(a_v, b_v)
+        beta ~ gamma(a_beta, b_beta)
+        X ~ N(UV, beta)
 
         Parameters
         -----------
         n_components: Embedding dimension
-        a_u: mean of elements in U
-        b_u: std of elements in U
-        a_v: mean of elements in
-        b_v: std of elements in V
-        b_x: std of elements in X
+
+        a_u: shape of elements in U
+        b_u: scale of elements in U
+
+        a_v: shape of elements in V
+        b_v: scale of elements in V
+
+        a_beta: shape of gamma distribution for beta
+        b_beta: scale of gamma distribution for beta
+
         stanfile: file with stancode
         cache_name: name for compiled model
+        stan_kwargs: Kwargs used for stanmodel.fit(**stan_kwargs)
         '''
         super().__init__()
         self.stanfile = stanfile
@@ -359,18 +409,24 @@ class NonNegativeFactorizer(BaseStanFactorizer):
         self.stan_kwargs = stan_kwargs
 
     def _likelihood_sample(self, P, picks):
+        '''
+        This is used to sample from predictive distribution. 
+
+        P: Rating estimates. Is a 2D array, where each row represent the selected
+           elements for a pair of sampled U and V.
+
+        picks: The indices for the elements used to extract the values in P.
+        '''
         self.assert_fitted()
         return np.random.normal(loc=P, scale=self.betas[picks].reshape(-1,1),
                                 size=P.shape)
 
-    def fit_transform(self, df: pd.DataFrame, **kwargs):
+    def fit_transform(self, df: pd.DataFrame):
         '''
         Parameters
         -----------
         df: should represent matrix in sparse format, each row should
             consists only of [row_index, col_index, value] in that order
-
-        kwargs: keyword arguments for StanModel.sampling()
 
         Returns
         --------
@@ -412,18 +468,28 @@ class ARD_Factorizer(BaseStanFactorizer):
         Model:
         U ~ N(mu_u, sigma_u)
         V ~ N(mu_v, sigma_v)
-        X ~ N(UV, sigma_x)
+        beta ~ gamma(a_beta, b_beta)
+        X ~ N(UV, beta)
 
         Parameters
         -----------
         n_components: Embedding dimension
+
         mu_u: mean of elements in U
         sigma_u: std of elements in U
-        mu_v: mean of elements in
+
+        mu_v: mean of elements in V
         sigma_v: std of elements in V
-        sigma_x: std of elements in X
+
+        a_alpha: shape of gamma distribution for alpha
+        b_alpha: scale of gamma distribution for alpha
+        
+        a_beta: shape of gamma distribution for beta
+        b_beta: scale of gamma distribution for beta
+
         stanfile: file with stancode
         cache_name: name for compiled model
+        stan_kwargs: Kwargs used for stanmodel.fit(**stan_kwargs)
         '''
         super().__init__()
         self.stanfile = stanfile
@@ -466,7 +532,7 @@ class ARD_Factorizer(BaseStanFactorizer):
 
         datadict = dict(
             n_components=self.n_components, n=len(df), p=self.p,
-            q=self.q, df=df, mu_u=self.mu_u, mu_v=self.mu_v, a_alpha=self.a_alpha, 
+            q=self.q, df=df, mu_u=self.mu_u, mu_v=self.mu_v, a_alpha=self.a_alpha,
             b_alpha=self.b_alpha, a_beta=self.a_beta, b_beta=self.b_beta
         )
 

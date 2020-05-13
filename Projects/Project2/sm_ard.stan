@@ -55,11 +55,13 @@ model {
     int rating;
     int R[3];
 
+    // Reparametrize such that we scale the columns with alpha values later. 
     to_vector(U) ~ normal(mu_u, 1);
     to_vector(VT) ~ normal(mu_v, 1);
     alpha ~ gamma(a_alpha, b_alpha);
     beta ~ gamma(a_beta, b_beta);
 
+    // Scale columns with alpha values and then multiply UV 
     X_hat = diag_post_multiply(U, alpha)*diag_post_multiply(VT, alpha)';
 
     for (i in 1:n) {
